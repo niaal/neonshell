@@ -1,4 +1,4 @@
-# Darknet Terminal
+# NEONSHELL
 
 A fully functional terminal emulator wrapped in 90s hacker-movie aesthetics.
 
@@ -21,7 +21,7 @@ shake on Enter, and chunky synthesized keypress sounds.
 ### Setup
 
 ```bash
-cd darknet-terminal
+cd neonshell
 npm install
 npm start
 ```
@@ -61,7 +61,7 @@ unsigned apps downloaded through Slack, Chrome, or AirDrop with a misleading
 the quarantine attribute that triggers the dialog.
 
 ```bash
-curl -fsSL https://github.com/CHANGEME/darknet-terminal/releases/download/v1.0.0/install.sh | bash
+curl -fsSL https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/install.sh | bash
 ```
 
 That single command auto-detects your CPU (Apple Silicon vs Intel), downloads
@@ -74,13 +74,13 @@ If you'd rather grab the file yourself, download the right tarball with `curl`
 
 ```bash
 # Apple Silicon (M1/M2/M3/M4):
-curl -fLO https://github.com/CHANGEME/darknet-terminal/releases/download/v1.0.0/darknet-terminal-1.0.0-arm64.tar.gz
+curl -fLO https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/neonshell-1.0.0-arm64.tar.gz
 
 # Intel:
-curl -fLO https://github.com/CHANGEME/darknet-terminal/releases/download/v1.0.0/darknet-terminal-1.0.0-x64.tar.gz
+curl -fLO https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/neonshell-1.0.0-x64.tar.gz
 
-tar -xzf darknet-terminal-1.0.0-*.tar.gz -C /Applications
-open "/Applications/Darknet Terminal.app"
+tar -xzf neonshell-1.0.0-*.tar.gz -C /Applications
+open "/Applications/NEONSHELL.app"
 ```
 
 ### macOS — already downloaded the DMG via Slack/Chrome?
@@ -89,9 +89,9 @@ If you have the "is damaged" dialog open right now, run this once to strip
 the quarantine attribute, then double-click the app again:
 
 ```bash
-xattr -dr com.apple.quarantine ~/Downloads/darknet-terminal-*.dmg
+xattr -dr com.apple.quarantine ~/Downloads/neonshell-*.dmg
 # or, if already moved to /Applications:
-xattr -dr com.apple.quarantine "/Applications/Darknet Terminal.app"
+xattr -dr com.apple.quarantine "/Applications/NEONSHELL.app"
 ```
 
 ### Windows
@@ -104,7 +104,7 @@ xattr -dr com.apple.quarantine "/Applications/Darknet Terminal.app"
 ### Linux
 
 1. Download the `.AppImage`.
-2. `chmod +x darknet-terminal-*.AppImage`
+2. `chmod +x neonshell-*.AppImage`
 3. Double-click or run from terminal.
 
 ## Customisation ideas

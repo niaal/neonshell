@@ -1,6 +1,6 @@
 {
-  "name": "darknet-terminal",
-  "productName": "Darknet Terminal",
+  "name": "neonshell",
+  "productName": "NEONSHELL",
   "version": "1.0.0",
   "description": "A terminal emulator wrapped in 90s hacker movie aesthetics",
   "main": "src/main.js",
@@ -26,8 +26,8 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.niaalholder.darknet-terminal",
-    "productName": "Darknet Terminal",
+    "appId": "com.niaalholder.neonshell",
+    "productName": "NEONSHELL",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -48,7 +48,7 @@
         { "target": "dmg",    "arch": ["arm64", "x64"] },
         { "target": "tar.gz", "arch": ["arm64", "x64"] }
       ],
-      "artifactName": "darknet-terminal-${version}-${arch}.${ext}",
+      "artifactName": "neonshell-${version}-${arch}.${ext}",
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
       "hardenedRuntime": false,

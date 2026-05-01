@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Darknet Terminal installer for macOS.
+# NEONSHELL installer for macOS.
 # Run with:
 #   curl -fsSL https://example.com/install.sh | bash
 # Or:
@@ -11,8 +11,8 @@
 set -euo pipefail
 
 VERSION="${VERSION:-1.0.0}"
-RELEASE_BASE="${RELEASE_BASE:-https://github.com/CHANGEME/darknet-terminal/releases/download/v${VERSION}}"
-APP_NAME="Darknet Terminal"
+RELEASE_BASE="${RELEASE_BASE:-https://github.com/CHANGEME/neonshell/releases/download/v${VERSION}}"
+APP_NAME="NEONSHELL"
 INSTALL_DIR="${INSTALL_DIR:-/Applications}"
 
 green()  { printf "\033[32m%s\033[0m\n" "$*"; }
@@ -26,8 +26,8 @@ fi
 
 ARCH="$(uname -m)"
 case "$ARCH" in
-  arm64) TARBALL="darknet-terminal-${VERSION}-arm64.tar.gz" ;;
-  x86_64) TARBALL="darknet-terminal-${VERSION}-x64.tar.gz" ;;
+  arm64) TARBALL="neonshell-${VERSION}-arm64.tar.gz" ;;
+  x86_64) TARBALL="neonshell-${VERSION}-x64.tar.gz" ;;
   *) red "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 
@@ -35,7 +35,7 @@ URL="${RELEASE_BASE}/${TARBALL}"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-green "▶ Downloading Darknet Terminal ${VERSION} (${ARCH})…"
+green "▶ Downloading NEONSHELL ${VERSION} (${ARCH})…"
 yellow "  ${URL}"
 if ! curl -fL --progress-bar -o "${TMPDIR}/${TARBALL}" "$URL"; then
   red "Download failed. Check the URL or your connection."

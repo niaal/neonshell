@@ -70,23 +70,23 @@ function inRoundedRect(x, y) {
 
 // Hand-rolled 5×7 pixel font for a chunky "DT" wordmark
 const GLYPHS = {
-  D: [
-    "11110",
+  N: [
+    "10001",
+    "11001",
+    "10101",
+    "10011",
     "10001",
     "10001",
     "10001",
-    "10001",
-    "10001",
-    "11110",
   ],
-  T: [
-    "11111",
-    "00100",
-    "00100",
-    "00100",
-    "00100",
-    "00100",
-    "00100",
+  S: [
+    "01111",
+    "10000",
+    "10000",
+    "01110",
+    "00001",
+    "00001",
+    "11110",
   ],
 };
 function drawGlyph(letter, originX, originY, scale, plot) {
@@ -114,8 +114,8 @@ const totalW = glyphW * 2 + gap;
 const startX = Math.round(cx - totalW / 2);
 const startY = Math.round(cy - glyphH / 2);
 const plot = (x, y) => wordmarkPixels.add(y * SIZE + x);
-drawGlyph("D", startX, startY, glyphScale, plot);
-drawGlyph("T", startX + glyphW + gap, startY, glyphScale, plot);
+drawGlyph("N", startX, startY, glyphScale, plot);
+drawGlyph("S", startX + glyphW + gap, startY, glyphScale, plot);
 
 function getPixel(x, y) {
   if (!inRoundedRect(x, y)) return [0, 0, 0, 0];

@@ -11,7 +11,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     backgroundColor: "#000000",
-    title: "DARKNET TERMINAL v3.1.7",
+    title: "NEONSHELL v3.1.7",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
