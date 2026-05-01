@@ -33,9 +33,9 @@ hacker-movie UI. Everything you type goes to a real shell session.
 
 ```bash
 npm run dist          # build for the current OS
-npm run dist:mac      # → dist/Darknet Terminal-1.0.0.dmg (arm64 + x64)
-npm run dist:win      # → dist/Darknet Terminal Setup 1.0.0.exe
-npm run dist:linux    # → dist/Darknet Terminal-1.0.0.AppImage
+npm run dist:mac      # → dist/NEONSHELL-1.0.0.dmg (arm64 + x64)
+npm run dist:win      # → dist/NEONSHELL Setup 1.0.0.exe
+npm run dist:linux    # → dist/NEONSHELL-1.0.0.AppImage
 ```
 
 Note: cross-compiling Windows builds from macOS works for most things
@@ -61,7 +61,7 @@ unsigned apps downloaded through Slack, Chrome, or AirDrop with a misleading
 the quarantine attribute that triggers the dialog.
 
 ```bash
-curl -fsSL https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/install.sh | bash
+curl -fsSL https://github.com/niaal/neonshell/releases/download/v1.0.0/install.sh | bash
 ```
 
 That single command auto-detects your CPU (Apple Silicon vs Intel), downloads
@@ -74,10 +74,10 @@ If you'd rather grab the file yourself, download the right tarball with `curl`
 
 ```bash
 # Apple Silicon (M1/M2/M3/M4):
-curl -fLO https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/neonshell-1.0.0-arm64.tar.gz
+curl -fLO https://github.com/niaal/neonshell/releases/download/v1.0.0/neonshell-1.0.0-arm64.tar.gz
 
 # Intel:
-curl -fLO https://github.com/CHANGEME/neonshell/releases/download/v1.0.0/neonshell-1.0.0-x64.tar.gz
+curl -fLO https://github.com/niaal/neonshell/releases/download/v1.0.0/neonshell-1.0.0-x64.tar.gz
 
 tar -xzf neonshell-1.0.0-*.tar.gz -C /Applications
 open "/Applications/NEONSHELL.app"

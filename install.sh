@@ -11,7 +11,7 @@
 set -euo pipefail
 
 VERSION="${VERSION:-1.0.0}"
-RELEASE_BASE="${RELEASE_BASE:-https://github.com/CHANGEME/neonshell/releases/download/v${VERSION}}"
+RELEASE_BASE="${RELEASE_BASE:-https://github.com/niaal/neonshell/releases/download/v${VERSION}}"
 APP_NAME="NEONSHELL"
 INSTALL_DIR="${INSTALL_DIR:-/Applications}"
 
