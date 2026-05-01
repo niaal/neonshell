@@ -1,0 +1,15 @@
+{
+  "name": "hacker-terminal",
+  "version": "1.0.0",
+  "description": "A terminal emulator wrapped in 90s hacker movie aesthetics",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^33.0.0",
+    "node-pty": "^1.0.0",
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0"
+  }
+}

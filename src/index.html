@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>DARKNET TERMINAL</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+  <style>
+    /* Bundled Nerd Font — ships with the app so prompt glyphs always render. */
+    @font-face {
+      font-family: 'JetBrainsMono Nerd Font';
+      font-style: normal;
+      font-weight: 400;
+      font-display: block;
+      src: url('./fonts/JetBrainsMonoNerdFont-Regular.ttf') format('truetype');
+    }
+    @font-face {
+      font-family: 'JetBrainsMono Nerd Font';
+      font-style: normal;
+      font-weight: 700;
+      font-display: block;
+      src: url('./fonts/JetBrainsMonoNerdFont-Bold.ttf') format('truetype');
+    }
+
+    :root {
+      --terminal-font: 'JetBrainsMono Nerd Font', 'MesloLGS NF',
+        'FiraCode Nerd Font', 'Hack Nerd Font', 'Courier New', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      overflow: hidden;
+      font-family: var(--terminal-font);
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    #app {
+      display: grid;
+      grid-template-columns: 1fr 210px;
+      grid-template-rows: 1fr 185px;
+      gap: 4px;
+      padding: 4px;
+      height: 100vh;
+      position: relative;
+      z-index: 10;
+    }
+
+    .panel {
+      border: 1px solid rgba(0,255,100,0.25);
+      background: rgba(0,10,0,0.65);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .panel-header {
+      font-size: 9px;
+      color: rgba(0,255,100,0.7);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      padding: 3px 6px 3px 8px;
+      border-bottom: 1px solid rgba(0,255,100,0.25);
+      background: rgba(0,255,0,0.05);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 18px;
+    }
+
+    .panel-header > span:first-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow: hidden;
+      padding: 6px;
+      min-height: 0;
+    }
+
+    /* ── Interactive HACK buttons ──────────────────────── */
+    .hack-btn {
+      font-family: var(--terminal-font);
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      padding: 2px 7px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(0,255,100,0.45);
+      color: #00ff66;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.05s;
+      flex-shrink: 0;
+    }
+    .hack-btn:hover {
+      background: rgba(0,255,100,0.18);
+      border-color: rgba(0,255,100,0.9);
+      color: #aaffaa;
+      text-shadow: 0 0 6px #0f0;
+    }
+    .hack-btn:active { transform: scale(0.95); background: rgba(0,255,100,0.32); }
+    .hack-btn.danger {
+      border-color: rgba(255,60,80,0.5);
+      color: #ff4060;
+    }
+    .hack-btn.danger:hover {
+      background: rgba(255,40,60,0.2);
+      border-color: rgba(255,40,60,0.95);
+      color: #ffaaaa;
+      text-shadow: 0 0 6px #ff4060;
+    }
+    .hack-btn.amber {
+      border-color: rgba(255,170,0,0.55);
+      color: #ffaa00;
+    }
+    .hack-btn.amber:hover {
+      background: rgba(255,170,0,0.2);
+      border-color: rgba(255,170,0,1);
+      color: #ffd070;
+      text-shadow: 0 0 6px #ffaa00;
+    }
+
+    /* Brief panel "fired" pulse when a countermeasure runs */
+    @keyframes panel-pulse-green {
+      0%   { box-shadow: inset 0 0 0 rgba(0,255,120,0); }
+      40%  { box-shadow: inset 0 0 60px rgba(0,255,120,0.55), 0 0 24px rgba(0,255,120,0.5); }
+      100% { box-shadow: inset 0 0 0 rgba(0,255,120,0); }
+    }
+    .panel.fx-fire { animation: panel-pulse-green 0.6s ease-out 1; }
+
+    /* ── Terminal Panel ─────────────────────────────────── */
+    #terminal-panel {
+      grid-row: 1 / 2;
+      grid-column: 1 / 2;
+    }
+
+    #terminal-container {
+      flex: 1;
+      padding: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Glyph-glitch effects on the terminal container (purely visual; PTY untouched) */
+    @keyframes term-glitch-shift {
+      0%, 100% { transform: translate(0,0); filter: none; }
+      20%      { transform: translate(2px,-1px); filter: hue-rotate(25deg) saturate(1.5); }
+      40%      { transform: translate(-3px,0);  filter: hue-rotate(-40deg) brightness(1.2); }
+      60%      { transform: translate(1px,1px); filter: contrast(1.5); }
+      80%      { transform: translate(-1px,0);  filter: hue-rotate(60deg); }
+    }
+    @keyframes term-glitch-slice {
+      0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0,0); filter: none; }
+      18%      { clip-path: inset(15% 0 65% 0); transform: translate(5px,0); filter: hue-rotate(20deg); }
+      36%      { clip-path: inset(45% 0 30% 0); transform: translate(-4px,0); }
+      54%      { clip-path: inset(70% 0 8% 0);  transform: translate(3px,0); filter: brightness(1.3); }
+      72%      { clip-path: inset(25% 0 50% 0); transform: translate(-2px,0); }
+    }
+    @keyframes term-glitch-fuzz {
+      0%, 100% { filter: none; }
+      50%      { filter: blur(0.7px) contrast(1.4) saturate(1.6); }
+    }
+    #terminal-container.glitch-shift { animation: term-glitch-shift 0.18s steps(5) 1; }
+    #terminal-container.glitch-slice { animation: term-glitch-slice 0.22s steps(5) 1; }
+    #terminal-container.glitch-fuzz  { animation: term-glitch-fuzz  0.18s ease-in-out 1; }
+
+    .term-corrupt-row {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      height: 1.3em;
+      pointer-events: none;
+      overflow: hidden;
+      white-space: nowrap;
+      font-family: var(--terminal-font);
+      font-size: 13px;
+      color: #00ff66;
+      background: rgba(0,0,0,0.55);
+      text-shadow: 0 0 4px #00ff66;
+      mix-blend-mode: screen;
+      z-index: 5;
+      animation: term-corrupt 0.18s steps(3) 1;
+    }
+    @keyframes term-corrupt {
+      0%   { opacity: 0;   transform: translateX(-3px); }
+      30%  { opacity: 1;   transform: translateX(2px); }
+      60%  { opacity: 0.9; transform: translateX(-1px); }
+      100% { opacity: 0;   transform: translateX(0); }
+    }
+
+    /* Make xterm background transparent so our panel bg shows */
+    #terminal-container .xterm {
+      padding: 4px;
+    }
+    #terminal-container .xterm-viewport {
+      background-color: transparent !important;
+    }
+    #terminal-container .xterm-screen {
+      background-color: transparent !important;
+    }
+
+    /* ── Sidebar ───────────────────────────────────────── */
+    #sidebar {
+      grid-row: 1 / 3;
+      grid-column: 2 / 3;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    #globe-panel { flex: 0 0 auto; }
+    #stats-panel { flex: 0 0 auto; }
+    #net-panel   { flex: 0 0 110px; }
+    #ops-panel   { flex: 1; min-height: 0; }
+
+    /* ── Bottom Panels ─────────────────────────────────── */
+    #bottom {
+      grid-row: 2 / 3;
+      grid-column: 1 / 2;
+      display: grid;
+      grid-template-columns: 0.9fr 1.4fr 0.9fr;
+      gap: 4px;
+    }
+
+    #server-grid-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* ── System Notes Panel (severity-tinted) ──────────── */
+    #notes-panel {
+      transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+      border-color: rgba(0,255,100,0.25);
+    }
+    #notes-panel.sev-info  { border-color: rgba(0,255,150,0.55); background: rgba(0,30,15,0.7);
+                             box-shadow: inset 0 0 24px rgba(0,255,120,0.12); }
+    #notes-panel.sev-warn  { border-color: rgba(255,170,0,0.7);  background: rgba(40,25,0,0.7);
+                             box-shadow: inset 0 0 30px rgba(255,170,0,0.18); }
+    #notes-panel.sev-crit  { border-color: rgba(255,40,60,0.85); background: rgba(40,0,8,0.78);
+                             box-shadow: inset 0 0 36px rgba(255,40,60,0.28), 0 0 18px rgba(255,40,60,0.4); }
+    #notes-panel.sev-fatal { border-color: rgba(255,0,40,1);     background: rgba(50,0,8,0.85);
+                             box-shadow: inset 0 0 50px rgba(255,0,40,0.5),  0 0 28px rgba(255,0,40,0.7);
+                             animation: notes-shake 0.18s steps(2) infinite; }
+
+    #notes-panel .panel-header {
+      transition: color 0.25s, background 0.25s, border-color 0.25s;
+    }
+    #notes-panel.sev-info  .panel-header { color:#00ff99; background:rgba(0,255,120,0.08); border-color:rgba(0,255,120,0.4); }
+    #notes-panel.sev-warn  .panel-header { color:#ffaa00; background:rgba(255,170,0,0.12); border-color:rgba(255,170,0,0.5); }
+    #notes-panel.sev-crit  .panel-header { color:#ff2244; background:rgba(255,40,60,0.18); border-color:rgba(255,40,60,0.6); }
+    #notes-panel.sev-fatal .panel-header { color:#ff0033; background:rgba(255,0,40,0.28);  border-color:rgba(255,0,40,0.85);
+                                            text-shadow: 0 0 8px #ff0033; }
+
+    @keyframes notes-shake {
+      0%, 100% { transform: translate(0,0); }
+      25%      { transform: translate(1px,-1px); }
+      50%      { transform: translate(-1px,1px); }
+      75%      { transform: translate(1px,1px); }
+    }
+
+    #notes-headline {
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 6px 4px 4px;
+      font-size: 16px;
+      min-height: 24px;
+      transition: color 0.2s, text-shadow 0.2s;
+    }
+    #notes-headline.sev-info  { color:#00ff99; text-shadow: 0 0 8px #00ff99; }
+    #notes-headline.sev-warn  { color:#ffaa00; text-shadow: 0 0 10px #ffaa00; font-size:18px; }
+    #notes-headline.sev-crit  { color:#ff2244; text-shadow: 0 0 14px #ff2244, 0 0 28px #ff2244; font-size:20px; }
+    #notes-headline.sev-fatal { color:#ff0033; text-shadow: 0 0 18px #ff0033, 0 0 38px #ff0033; font-size:22px;
+                                animation: notes-shake 0.12s steps(2) infinite; }
+
+    .notes-feed {
+      font-family: var(--terminal-font);
+      font-size: 9px;
+      line-height: 1.5;
+      max-height: 56px;
+      overflow: hidden;
+      padding: 0 2px;
+    }
+    .notes-feed div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* progress bars inside the notes panel */
+    .nbar {
+      font-family: var(--terminal-font);
+      font-size: 9px;
+      margin: 3px 2px;
+    }
+    .nbar-label { display:flex; justify-content:space-between; margin-bottom:1px; }
+    .nbar-track {
+      width:100%; height:4px;
+      background:rgba(0,255,0,0.08);
+      border:1px solid rgba(0,255,0,0.3);
+    }
+    .nbar.virus .nbar-label  { color:#ff4060; }
+    .nbar.virus .nbar-track  { border-color:rgba(255,40,60,0.5); background:rgba(255,40,60,0.08); }
+    .nbar.virus .nbar-fill   { background:linear-gradient(90deg, rgba(255,40,60,0.6), rgba(255,80,80,0.95)); }
+    .nbar.garb  .nbar-label  { color:#88ff88; }
+    .nbar.garb  .nbar-fill   { background:linear-gradient(90deg, rgba(0,200,80,0.5), rgba(0,255,150,0.9)); }
+    .nbar-fill {
+      height:100%; width:0%;
+      transition: width 0.2s;
+    }
+
+    /* ── CRT Effects Layer ─────────────────────────────── */
+    #scanlines {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 1px,
+        rgba(0,0,0,0.12) 1px, rgba(0,0,0,0.12) 2px
+      );
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0.3;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
+      pointer-events: none;
+      z-index: 51;
+    }
+
+    /* CRT scan beam — a soft horizontal band slowly sweeping down the screen */
+    #crt-scan {
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 140px;
+      pointer-events: none;
+      z-index: 52;
+      mix-blend-mode: screen;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,255,140,0)    0%,
+        rgba(0,255,140,0.04) 30%,
+        rgba(160,255,200,0.22) 50%,
+        rgba(0,255,140,0.04) 70%,
+        rgba(0,255,140,0)    100%
+      );
+      animation: crt-scan 7s linear infinite;
+      will-change: transform;
+    }
+    @keyframes crt-scan {
+      0%   { transform: translateY(-150px); }
+      100% { transform: translateY(100vh); }
+    }
+
+    /* ── Matrix Rain Background ────────────────────────── */
+    #matrix-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      opacity: 0.55;
+    }
+
+    /* ── Access Overlay ────────────────────────────────── */
+    #access-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s, background 0.3s;
+    }
+
+    #access-overlay.visible {
+      opacity: 1;
+    }
+
+    #access-overlay.granted {
+      background: rgba(0,40,0,0.4);
+    }
+
+    #access-overlay.denied {
+      background: rgba(60,0,0,0.4);
+    }
+
+    #access-text {
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      font-size: clamp(36px, 7vw, 80px);
+      font-weight: 900;
+      letter-spacing: 12px;
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    #access-text.granted {
+      color: #0f0;
+      text-shadow: 0 0 30px #0f0, 0 0 60px #0f0, 0 0 100px rgba(0,255,0,0.5);
+    }
+
+    #access-text.denied {
+      color: #f00;
+      text-shadow: 0 0 30px #f00, 0 0 60px #f00, 0 0 100px rgba(255,0,0,0.5);
+    }
+
+    /* ── System Shock (Enter-key shake + red flash) ────── */
+    @keyframes window-shake {
+      0%, 100% { transform: translate(0,0); }
+      10%      { transform: translate(-4px, 2px); }
+      20%      { transform: translate(4px, -3px); }
+      30%      { transform: translate(-3px, 3px); }
+      40%      { transform: translate(3px, 1px); }
+      50%      { transform: translate(-2px, -2px); }
+      60%      { transform: translate(3px, 2px); }
+      70%      { transform: translate(-4px, 1px); }
+      80%      { transform: translate(2px, -1px); }
+      90%      { transform: translate(-1px, 2px); }
+    }
+    #app.shake { animation: window-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+    #app.red-alert .panel {
+      border-color: rgba(255,40,60,0.85) !important;
+      background: rgba(40,0,8,0.78) !important;
+      box-shadow: inset 0 0 30px rgba(255,40,60,0.3), 0 0 18px rgba(255,40,60,0.35) !important;
+      transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+    }
+    #app.red-alert .panel-header {
+      color: #ff2244 !important;
+      background: rgba(255,40,60,0.22) !important;
+      border-color: rgba(255,40,60,0.6) !important;
+      text-shadow: 0 0 6px #ff2244;
+    }
+
+    /* ── Misc ──────────────────────────────────────────── */
+    .small-text {
+      font-size: 9px;
+      line-height: 1.4;
+      white-space: pre;
+    }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: rgba(0,255,0,0.05); }
+    ::-webkit-scrollbar-thumb { background: rgba(0,255,0,0.3); }
+  </style>
+</head>
+<body>
+
+  <!-- Background matrix rain -->
+  <canvas id="matrix-bg"></canvas>
+
+  <!-- CRT overlays -->
+  <div id="scanlines"></div>
+  <div id="crt-scan"></div>
+  <div id="vignette"></div>
+
+  <!-- ACCESS GRANTED/DENIED -->
+  <div id="access-overlay">
+    <div id="access-text"></div>
+  </div>
+
+  <!-- Main layout -->
+  <div id="app">
+    <!-- Terminal -->
+    <div class="panel" id="terminal-panel">
+      <div class="panel-header">
+        <span>■ Terminal // Secure Shell // Encrypted Channel</span>
+        <button class="hack-btn" id="btn-mute" title="Toggle keypress SFX">SFX: ON</button>
+      </div>
+      <div id="terminal-container"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="panel" id="globe-panel">
+        <div class="panel-header">
+          <span>■ Global Net</span>
+          <button class="hack-btn" id="btn-scramble">SCRAMBLE</button>
+        </div>
+        <div class="panel-body" style="display:flex;justify-content:center;padding:4px;">
+          <canvas id="globe" width="190" height="190"></canvas>
+        </div>
+      </div>
+
+      <div class="panel" id="stats-panel">
+        <div class="panel-header">
+          <span>■ System</span>
+          <button class="hack-btn amber" id="btn-overclock">OVERCLOCK</button>
+        </div>
+        <div class="panel-body" id="stats-content" class="small-text"></div>
+      </div>
+
+      <div class="panel" id="net-panel">
+        <div class="panel-header"><span>■ Net Traffic</span></div>
+        <div class="panel-body" id="netlog-content"></div>
+      </div>
+
+      <div class="panel" id="ops-panel">
+        <div class="panel-header">
+          <span>■ Operations</span>
+          <button class="hack-btn" id="btn-execute-all">EXEC ALL</button>
+        </div>
+        <div class="panel-body" id="ops-content"></div>
+      </div>
+    </div>
+
+    <!-- Bottom panels -->
+    <div id="bottom">
+      <div class="panel">
+        <div class="panel-header"><span>■ Memory Dump</span></div>
+        <div class="panel-body" id="hexdump-content"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span>■ Server Grid // Threat Map</span>
+          <button class="hack-btn" id="btn-deploy-cm">DEPLOY CM</button>
+        </div>
+        <div class="panel-body" style="padding:2px;">
+          <canvas id="server-grid-canvas"></canvas>
+        </div>
+      </div>
+      <div class="panel" id="notes-panel">
+        <div class="panel-header" id="notes-header">
+          <span id="notes-header-text">■ System Notes // Status: NOMINAL</span>
+          <button class="hack-btn danger" id="btn-purge">PURGE</button>
+        </div>
+        <div class="panel-body" style="padding:4px 6px;display:flex;flex-direction:column;gap:2px;">
+          <div id="notes-headline" class="sev-info">SYSTEM NOMINAL</div>
+          <div class="nbar virus">
+            <div class="nbar-label"><span id="virus-name">— idle —</span><span id="virus-pct">0%</span></div>
+            <div class="nbar-track"><div class="nbar-fill" id="virus-fill"></div></div>
+          </div>
+          <div class="nbar garb">
+            <div class="nbar-label"><span id="garb-name">— idle —</span><span id="garb-pct">0%</span></div>
+            <div class="nbar-track"><div class="nbar-fill" id="garb-fill"></div></div>
+          </div>
+          <div class="notes-feed" id="notes-feed"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script>
+    // ─────────────────────────────────────────────────────
+    //  XTERM.JS TERMINAL
+    // ─────────────────────────────────────────────────────
+    const Terminal = window.Terminal?.Terminal || window.Terminal;
+    const FitAddon = window.FitAddon?.FitAddon || window.FitAddon;
+
+    const term = new Terminal({
+      fontSize: 13,
+      fontFamily: getComputedStyle(document.documentElement)
+        .getPropertyValue('--terminal-font').trim()
+        || "'MesloLGS NF', 'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'Fira Code', 'Courier New', monospace",
+      theme: {
+        background: "rgba(0,0,0,0)",  // transparent
+        foreground: "#00ff66",
+        cursor: "#00ff66",
+        cursorAccent: "#000",
+        selectionBackground: "rgba(0,255,100,0.3)",
+        black: "#000000",
+        green: "#00ff66",
+        brightGreen: "#00ff99",
+      },
+      allowTransparency: true,
+      cursorBlink: true,
+      cursorStyle: "block",
+      scrollback: 2000,
+    });
+
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+
+    const container = document.getElementById("terminal-container");
+    term.open(container);
+
+    function safeFit() {
+      try {
+        fitAddon.fit();
+        if (term.cols && term.rows) window.terminal.resize(term.cols, term.rows);
+      } catch (_) { /* container not ready yet */ }
+    }
+
+    // Fit a few times during initial layout settle
+    [50, 150, 400, 900].forEach(d => setTimeout(safeFit, d));
+
+    // Re-fit on window resize
+    window.addEventListener("resize", safeFit);
+
+    // Re-fit whenever the container itself actually changes size
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => safeFit());
+      ro.observe(container);
+    }
+
+    // Bridge xterm <-> PTY
+    term.onData((data) => window.terminal.sendInput(data));
+    window.terminal.onData((data) => term.write(data));
+
+    // ─────────────────────────────────────────────────────
+    //  ACCESS GRANTED / DENIED OVERLAY
+    // ─────────────────────────────────────────────────────
+    const overlay = document.getElementById("access-overlay");
+    const accessText = document.getElementById("access-text");
+    let overlayTimeout = null;
+    let commandPending = false;
+
+    // Watch for Enter key to detect command submission
+    const appEl = document.getElementById("app");
+    function triggerSystemShock() {
+      appEl.classList.add("shake", "red-alert");
+      playEventSound("shock", { volume: 0.85 });
+      setTimeout(() => appEl.classList.remove("shake"),     440);
+      setTimeout(() => appEl.classList.remove("red-alert"), 600);
+    }
+
+    // ─── Heavy mechanical keypress SFX (Hackers-style) ───
+    // Uses HTMLAudioElement (not Web Audio fetch) because Electron's default
+    // webSecurity policy blocks fetch() of file:// URLs. Pool of clones lets
+    // rapid presses overlap without restarting each other.
+    const KEY_SOUNDS = ["key1.wav", "key2.wav", "key3.wav", "key4.wav", "key5.wav"];
+    const POOL_SIZE = 4;
+    const sfxPools = {};       // filename -> { idx, els[] }
+    let lastKeyTime = 0;
+    let sfxMuted = false;
+
+    // Event sounds (overlays + buttons). Smaller pool — they don't overlap fast.
+    const EVENT_SOUNDS = {
+      granted:   "access_granted.wav",
+      denied:    "access_denied.mp3",       // bundled mega-horn siren
+      shock:     "shock.mp3",               // bundled cinematic impact
+      escalate:  "alert_attention.mp3",     // crit/fatal severity escalation
+      deploy:    "btn_deploy.wav",
+      purge:     "btn_purge.wav",
+      scramble:  "btn_scramble.wav",
+      overclock: "btn_overclock.wav",
+      execute:   "btn_execute.wav",
+    };
+    const EVENT_POOL_SIZE = 2;
+
+    function loadKeySFX() {
+      const items = [
+        ...KEY_SOUNDS.map(f => ({ file: f, pool: POOL_SIZE })),
+        { file: "enter.wav", pool: POOL_SIZE },
+        ...Object.values(EVENT_SOUNDS).map(f => ({ file: f, pool: EVENT_POOL_SIZE })),
+      ];
+      for (const { file, pool: poolSize } of items) {
+        const pool = { idx: 0, els: [] };
+        for (let i = 0; i < poolSize; i++) {
+          const a = new Audio(`./sounds/${file}`);
+          a.preload = "auto";
+          a.addEventListener("error", () =>
+            console.warn(`SFX load failed: ${file}`, a.error));
+          pool.els.push(a);
+        }
+        sfxPools[file] = pool;
+      }
+      console.log(`[sfx] preloading ${items.length} samples`);
+    }
+    loadKeySFX();
+
+    // Generic event-sound player (no autorepeat throttle — these are user-driven).
+    function playEventSound(name, opts = {}) {
+      if (sfxMuted) return;
+      const file = EVENT_SOUNDS[name];
+      if (!file) return;
+      const pool = sfxPools[file];
+      if (!pool) return;
+      const el = pool.els[pool.idx];
+      pool.idx = (pool.idx + 1) % pool.els.length;
+      try {
+        el.currentTime = 0;
+        el.volume       = (opts.volume       ?? 0.7) + (Math.random() - 0.5) * 0.08;
+        el.playbackRate = (opts.playbackRate ?? 1.0) + (Math.random() - 0.5) * 0.04;
+        const p = el.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      } catch (_) {}
+    }
+
+    function playKeySound(isEnter) {
+      if (sfxMuted) return;
+      const now = performance.now();
+      if (now - lastKeyTime < 28) return;   // autorepeat throttle
+      lastKeyTime = now;
+
+      const file = isEnter
+        ? "enter.wav"
+        : KEY_SOUNDS[Math.floor(Math.random() * KEY_SOUNDS.length)];
+      const pool = sfxPools[file];
+      if (!pool) return;
+
+      const el = pool.els[pool.idx];
+      pool.idx = (pool.idx + 1) % pool.els.length;
+      try {
+        el.currentTime = 0;
+        el.volume       = (isEnter ? 0.85 : 0.6)  + Math.random() * 0.12;
+        el.playbackRate = isEnter ? 0.94 + Math.random() * 0.10
+                                  : 0.88 + Math.random() * 0.22;
+        const p = el.play();
+        if (p && typeof p.catch === "function") {
+          p.catch(err => console.warn("SFX play rejected:", err.message || err));
+        }
+      } catch (err) {
+        console.warn("SFX play threw:", err);
+      }
+    }
+
+    // Mute toggle button
+    const muteBtn = document.getElementById("btn-mute");
+    muteBtn.addEventListener("click", () => {
+      sfxMuted = !sfxMuted;
+      muteBtn.textContent = sfxMuted ? "SFX: OFF" : "SFX: ON";
+      muteBtn.classList.toggle("danger", sfxMuted);
+    });
+
+    term.onData((data) => {
+      // \r = Enter key
+      const isEnter = (data === "\r" || data === "\n");
+      if (isEnter) {
+        commandPending = true;
+        // ~18% of Enter presses: rattle the screen and slam every panel red.
+        if (Math.random() < 0.18) triggerSystemShock();
+      }
+      // Play SFX for any non-empty keystroke. Bracketed-paste / control sequences
+      // come through as multi-char strings — only fire once for those.
+      if (data && data.length > 0) playKeySound(isEnter);
+    });
+
+    // Watch PTY output for prompt patterns (command finished)
+    let outputBuffer = "";
+    window.terminal.onData((data) => {
+      outputBuffer += data;
+
+      // If we sent a command and output contains a prompt-like pattern,
+      // trigger the overlay. Looks for common prompt endings.
+      if (commandPending && /[\$#%>]\s*$/.test(outputBuffer)) {
+        commandPending = false;
+        outputBuffer = "";
+
+        // Random chance of denied for fun, mostly granted
+        const type = Math.random() > 0.15 ? "granted" : "denied";
+        showAccessOverlay(type);
+      }
+
+      // Don't let buffer grow forever
+      if (outputBuffer.length > 2000) {
+        outputBuffer = outputBuffer.slice(-500);
+      }
+    });
+
+    function showAccessOverlay(type) {
+      if (overlayTimeout) clearTimeout(overlayTimeout);
+
+      accessText.textContent = `ACCESS ${type.toUpperCase()}`;
+      accessText.className = type;
+      overlay.className = `visible ${type}`;
+      playEventSound(type === "granted" ? "granted" : "denied");
+
+      overlayTimeout = setTimeout(() => {
+        overlay.className = "";
+      }, 1100);
+    }
+
+    // ─────────────────────────────────────────────────────
+    //  MATRIX RAIN BACKGROUND
+    // ─────────────────────────────────────────────────────
+    const matrixCanvas = document.getElementById("matrix-bg");
+    const matrixCtx = matrixCanvas.getContext("2d");
+    const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF@#$%&*<>{}[]";
+    let matrixColumns = [];
+
+    const MATRIX_FONT_SIZE = 16;
+    function resizeMatrix() {
+      matrixCanvas.width = window.innerWidth;
+      matrixCanvas.height = window.innerHeight;
+      const cols = Math.floor(matrixCanvas.width / MATRIX_FONT_SIZE);
+      matrixColumns = Array.from({ length: cols }, () =>
+        Math.floor(Math.random() * (matrixCanvas.height / MATRIX_FONT_SIZE))
+      );
+    }
+    resizeMatrix();
+    window.addEventListener("resize", resizeMatrix);
+
+    setInterval(() => {
+      const fontSize = MATRIX_FONT_SIZE;
+      // Lower trail-fade alpha → characters linger longer and the column tails are visible.
+      matrixCtx.fillStyle = "rgba(0,0,0,0.04)";
+      matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+      matrixCtx.font = `bold ${fontSize}px monospace`;
+
+      matrixColumns.forEach((y, i) => {
+        const char = chars[Math.floor(Math.random() * chars.length)];
+        const b = Math.random();
+        if (b > 0.97) {
+          // Bright white head with glow
+          matrixCtx.shadowColor = "#0f0";
+          matrixCtx.shadowBlur = 12;
+          matrixCtx.fillStyle = "#fff";
+        } else if (b > 0.6) {
+          matrixCtx.shadowColor = "#0f0";
+          matrixCtx.shadowBlur = 6;
+          matrixCtx.fillStyle = "#00ff66";
+        } else {
+          matrixCtx.shadowBlur = 0;
+          matrixCtx.fillStyle = `rgba(0,255,80,${0.6 + b * 0.4})`;
+        }
+        matrixCtx.fillText(char, i * fontSize, y * fontSize);
+
+        if (y * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+          matrixColumns[i] = 0;
+        } else {
+          matrixColumns[i] = y + 1;
+        }
+      });
+      matrixCtx.shadowBlur = 0;
+    }, 45);
+
+    // ─────────────────────────────────────────────────────
+    //  WIREFRAME GLOBE
+    // ─────────────────────────────────────────────────────
+    const globeCanvas = document.getElementById("globe");
+    const globeCtx = globeCanvas.getContext("2d");
+    const globeSize = 190;
+    const globeCx = globeSize / 2;
+    const globeCy = globeSize / 2;
+    const globeR = globeSize * 0.42;
+    let globeAngle = 0;
+
+    // Random connections — some flagged hostile (red attack arcs)
+    const connections = Array.from({ length: 7 }, () => ({
+      lat1: (Math.random() - 0.5) * Math.PI,
+      lon1: Math.random() * Math.PI * 2,
+      lat2: (Math.random() - 0.5) * Math.PI,
+      lon2: Math.random() * Math.PI * 2,
+      progress: Math.random(),
+      speed: 0.005 + Math.random() * 0.01,
+      hostile: Math.random() < 0.28,
+    }));
+
+    // Static "landmass" cluster dots — give the planet visible surface texture.
+    const landDots = [];
+    const NUM_CLUSTERS = 14;
+    for (let i = 0; i < NUM_CLUSTERS; i++) {
+      const cLat = (Math.random() - 0.5) * Math.PI * 0.9;
+      const cLon = Math.random() * Math.PI * 2;
+      const points = 10 + Math.floor(Math.random() * 18);
+      for (let j = 0; j < points; j++) {
+        landDots.push({
+          lat: cLat + (Math.random() - 0.5) * 0.55,
+          lon: cLon + (Math.random() - 0.5) * 0.55,
+          size: 0.6 + Math.random() * 1.6,
+        });
+      }
+    }
+
+    function projectGlobe(lat, lon, rot) {
+      const x = globeR * Math.cos(lat) * Math.sin(lon + rot);
+      const y = globeR * Math.sin(lat);
+      const z = globeR * Math.cos(lat) * Math.cos(lon + rot);
+      return { x: globeCx + x, y: globeCy - y, z };
+    }
+
+    setInterval(() => {
+      globeAngle += 0.008;
+      globeCtx.clearRect(0, 0, globeSize, globeSize);
+
+      // 1. Atmospheric halo (soft outer glow)
+      const atmo = globeCtx.createRadialGradient(globeCx, globeCy, globeR * 0.92, globeCx, globeCy, globeR * 1.35);
+      atmo.addColorStop(0, "rgba(0,255,120,0.35)");
+      atmo.addColorStop(0.5, "rgba(0,255,120,0.12)");
+      atmo.addColorStop(1, "rgba(0,255,120,0)");
+      globeCtx.fillStyle = atmo;
+      globeCtx.beginPath();
+      globeCtx.arc(globeCx, globeCy, globeR * 1.35, 0, Math.PI * 2);
+      globeCtx.fill();
+
+      // 2. Sphere body — radial gradient with off-center "lit" highlight
+      const body = globeCtx.createRadialGradient(
+        globeCx - globeR * 0.35, globeCy - globeR * 0.35, globeR * 0.05,
+        globeCx, globeCy, globeR
+      );
+      body.addColorStop(0,    "rgba(0,120,60,0.85)");
+      body.addColorStop(0.45, "rgba(0,55,30,0.9)");
+      body.addColorStop(0.85, "rgba(0,25,12,0.95)");
+      body.addColorStop(1,    "rgba(0,8,4,1)");
+      globeCtx.fillStyle = body;
+      globeCtx.beginPath();
+      globeCtx.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+      globeCtx.fill();
+
+      // Clip subsequent surface drawing to the sphere
+      globeCtx.save();
+      globeCtx.beginPath();
+      globeCtx.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+      globeCtx.clip();
+
+      // 3. Landmass dots (only visible hemisphere)
+      landDots.forEach(d => {
+        const p = projectGlobe(d.lat, d.lon, globeAngle);
+        if (p.z > 0) {
+          // Brighter near the lit highlight, dimmer toward limb
+          const lit = (p.z / globeR) * 0.7 + 0.3;
+          globeCtx.fillStyle = `rgba(120,255,160,${0.55 * lit})`;
+          globeCtx.beginPath();
+          globeCtx.arc(p.x, p.y, d.size, 0, Math.PI * 2);
+          globeCtx.fill();
+        }
+      });
+
+      // 4. Latitude / longitude wireframe — brighter on visible side
+      globeCtx.strokeStyle = "rgba(0,255,120,0.32)";
+      globeCtx.lineWidth = 0.7;
+      for (let lat = -Math.PI / 2; lat <= Math.PI / 2; lat += Math.PI / 8) {
+        globeCtx.beginPath();
+        for (let lon = 0; lon <= Math.PI * 2; lon += 0.08) {
+          const p = projectGlobe(lat, lon, globeAngle);
+          if (p.z > 0) { if (lon === 0) globeCtx.moveTo(p.x, p.y); else globeCtx.lineTo(p.x, p.y); }
+          else globeCtx.moveTo(p.x, p.y);
+        }
+        globeCtx.stroke();
+      }
+      for (let lon = 0; lon < Math.PI * 2; lon += Math.PI / 8) {
+        globeCtx.beginPath();
+        for (let lat = -Math.PI / 2; lat <= Math.PI / 2; lat += 0.08) {
+          const p = projectGlobe(lat, lon, globeAngle);
+          if (p.z > 0) { if (lat === -Math.PI / 2) globeCtx.moveTo(p.x, p.y); else globeCtx.lineTo(p.x, p.y); }
+          else globeCtx.moveTo(p.x, p.y);
+        }
+        globeCtx.stroke();
+      }
+
+      globeCtx.restore();
+
+      // Specular highlight (tiny lit spot for "planet-y" look)
+      const spec = globeCtx.createRadialGradient(
+        globeCx - globeR * 0.4, globeCy - globeR * 0.4, 0,
+        globeCx - globeR * 0.4, globeCy - globeR * 0.4, globeR * 0.55
+      );
+      spec.addColorStop(0, "rgba(180,255,200,0.25)");
+      spec.addColorStop(1, "rgba(180,255,200,0)");
+      globeCtx.fillStyle = spec;
+      globeCtx.beginPath();
+      globeCtx.arc(globeCx, globeCy, globeR, 0, Math.PI * 2);
+      globeCtx.fill();
+
+      // 5. Connection arcs + endpoint echoes
+      connections.forEach((c) => {
+        c.progress += c.speed;
+        if (c.progress > 1) {
+          c.progress = 0;
+          c.lat1 = (Math.random() - 0.5) * Math.PI;
+          c.lon1 = Math.random() * Math.PI * 2;
+          c.lat2 = (Math.random() - 0.5) * Math.PI;
+          c.lon2 = Math.random() * Math.PI * 2;
+          c.hostile = Math.random() < 0.28;
+        }
+
+        const p1 = projectGlobe(c.lat1, c.lon1, globeAngle);
+        const p2 = projectGlobe(c.lat2, c.lon2, globeAngle);
+
+        // Hostile-vs-friendly color palette
+        const echoRGB = c.hostile ? "255,60,60"  : "0,255,160";
+        const arcRGB  = c.hostile ? "255,80,90"  : "120,255,180";
+        const dotCol  = c.hostile ? "#ffaaaa"    : "#aaffaa";
+        const coreCol = c.hostile ? "#ffeeee"    : "#ffffff";
+        const glowCol = c.hostile ? "#ff2233"    : "#00ff66";
+
+        // Echo rings at endpoints (4 staggered rings expanding outward)
+        [p1, p2].forEach(p => {
+          if (p.z <= 0) return;
+          for (let k = 0; k < 4; k++) {
+            const phase = (c.progress + k / 4) % 1;
+            const radius = 2 + phase * 26;
+            const alpha = Math.pow(1 - phase, 1.4) * 0.85;
+            globeCtx.strokeStyle = `rgba(${echoRGB},${alpha})`;
+            globeCtx.lineWidth = 1.5 - phase;
+            globeCtx.beginPath();
+            globeCtx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+            globeCtx.stroke();
+          }
+        });
+
+        if (p1.z > 0 && p2.z > 0) {
+          // Bright endpoint nodes with halo
+          [p1, p2].forEach(p => {
+            globeCtx.shadowColor = glowCol;
+            globeCtx.shadowBlur = 14;
+            globeCtx.fillStyle = dotCol;
+            globeCtx.beginPath();
+            globeCtx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
+            globeCtx.fill();
+            globeCtx.fillStyle = coreCol;
+            globeCtx.beginPath();
+            globeCtx.arc(p.x, p.y, 1.2, 0, Math.PI * 2);
+            globeCtx.fill();
+          });
+          globeCtx.shadowBlur = 0;
+
+          // Dotted/dashed connection arc — animated dash offset = "flowing" energy
+          globeCtx.shadowColor = glowCol;
+          globeCtx.shadowBlur = 6;
+          globeCtx.strokeStyle = `rgba(${arcRGB},${0.55 + 0.45 * c.progress})`;
+          globeCtx.lineWidth = c.hostile ? 1.8 : 1.5;
+          globeCtx.setLineDash(c.hostile ? [2, 4] : [3, 3]);
+          globeCtx.lineDashOffset = -c.progress * 30;
+          globeCtx.beginPath();
+          const steps = Math.floor(28 * c.progress);
+          for (let i = 0; i <= steps; i++) {
+            const t = i / 28;
+            const lat = c.lat1 + (c.lat2 - c.lat1) * t;
+            const lon = c.lon1 + (c.lon2 - c.lon1) * t;
+            const elev = 1 + 0.18 * Math.sin(t * Math.PI);
+            const pe = projectGlobe(lat, lon, globeAngle);
+            pe.x = globeCx + (pe.x - globeCx) * elev;
+            pe.y = globeCy + (pe.y - globeCy) * elev;
+            if (i === 0) globeCtx.moveTo(pe.x, pe.y); else globeCtx.lineTo(pe.x, pe.y);
+          }
+          globeCtx.stroke();
+          globeCtx.setLineDash([]);
+          globeCtx.lineDashOffset = 0;
+          globeCtx.shadowBlur = 0;
+
+          // Travelling pulse dot with bright core
+          const t = c.progress;
+          const pp = projectGlobe(
+            c.lat1 + (c.lat2 - c.lat1) * t,
+            c.lon1 + (c.lon2 - c.lon1) * t,
+            globeAngle
+          );
+          if (pp.z > 0) {
+            const elev = 1 + 0.18 * Math.sin(t * Math.PI);
+            pp.x = globeCx + (pp.x - globeCx) * elev;
+            pp.y = globeCy + (pp.y - globeCy) * elev;
+            globeCtx.shadowColor = glowCol;
+            globeCtx.shadowBlur = 12;
+            globeCtx.fillStyle = coreCol;
+            globeCtx.beginPath(); globeCtx.arc(pp.x, pp.y, 3.2, 0, Math.PI * 2); globeCtx.fill();
+            globeCtx.shadowBlur = 0;
+          }
+        }
+      });
+    }, 33);
+
+    // ─────────────────────────────────────────────────────
+    //  HEX DUMP
+    // ─────────────────────────────────────────────────────
+    const hexEl = document.getElementById("hexdump-content");
+    setInterval(() => {
+      let html = "";
+      for (let i = 0; i < 10; i++) {
+        const addr = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
+        const bytes = Array.from({ length: 8 }, () =>
+          Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
+        ).join(" ");
+        html += `<div style="font-size:9px;line-height:1.4;color:rgba(0,255,100,0.5);white-space:pre;font-family:var(--terminal-font)">0x${addr}  ${bytes}</div>`;
+      }
+      hexEl.innerHTML = html;
+    }, 150);
+
+    // ─────────────────────────────────────────────────────
+    //  NETWORK LOG
+    // ─────────────────────────────────────────────────────
+    const netEl = document.getElementById("netlog-content");
+    const protocols = ["TCP", "UDP", "SSH", "TLS", "ICMP", "DNS"];
+    const statuses = ["SYN_SENT", "ESTABLISHED", "FIN_WAIT", "LISTENING", "ENCRYPTED", "TUNNELED"];
+    let netEntries = [];
+
+    setInterval(() => {
+      const ip = () => `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
+      const proto = protocols[Math.floor(Math.random() * protocols.length)];
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      const port1 = Math.floor(Math.random() * 65535);
+      const port2 = Math.floor(Math.random() * 65535);
+      netEntries.push(`${proto} ${ip()}:${port1} → ${ip()}:${port2} [${status}]`);
+      if (netEntries.length > 9) netEntries = netEntries.slice(-9);
+
+      netEl.innerHTML = netEntries.map((e, i) => {
+        const opacity = 0.4 + (i / netEntries.length) * 0.6;
+        return `<div style="font-size:9px;line-height:1.5;color:rgba(0,200,255,${opacity});font-family:var(--terminal-font)">${e}</div>`;
+      }).join("");
+    }, 900);
+
+    // ─────────────────────────────────────────────────────
+    //  SYSTEM STATS
+    // ─────────────────────────────────────────────────────
+    const statsEl = document.getElementById("stats-content");
+    function renderStats() {
+      const t = (typeof overclockLevel !== "undefined") ? overclockLevel / OC_MAX : 0;
+      const cpu = (30 + (1 - t) * 50 + t * (66 + Math.random() * 4)).toFixed(1);
+      const mem = (40 + (1 - t) * 35 + t * (55 + Math.random() * 8)).toFixed(1);
+      const net = Math.floor((Math.random() * 600) + t * (400 + Math.random() * 300));
+      const thr = Math.floor(120 + (1 - t) * 100 + t * (450 + Math.random() * 150));
+      const days = Math.floor(Math.random() * 99);
+      const hrs  = Math.floor(Math.random() * 24);
+      const barLen = Math.min(28, Math.floor(cpu / 12) + Math.floor(t * 14));
+      const bar = "█".repeat(barLen);
+
+      const fontSize = (9 + t * 8).toFixed(1);
+      const lineH    = (1.55 + t * 0.25).toFixed(2);
+      const c = (typeof ocColor === "function") ? ocColor(t) : { r: 0, g: 255, b: 100 };
+      const col = `rgb(${c.r},${c.g},${c.b})`;
+      const glow = t > 0.05 ? `text-shadow: 0 0 ${4 + t * 14}px rgba(${c.r},${c.g},${c.b},${0.4 + t * 0.6});` : "";
+      const weight = t > 0.5 ? "font-weight:700;" : "";
+      const tag = t > 0.85
+        ? ' <span style="color:#fff;background:rgba(255,0,30,0.7);padding:0 4px;animation:notes-shake 0.12s steps(2) infinite;">REDLINE</span>'
+        : t > 0.6 ? ' <span style="color:#ffaa00;">[!]</span>'
+        : "";
+
+      statsEl.innerHTML = `
+        <div style="font-size:${fontSize}px;line-height:${lineH};color:${col};font-family:var(--terminal-font);${glow}${weight}letter-spacing:${(t*0.6).toFixed(2)}px">
+          <div>CPU: ${cpu}% ${bar}${tag}</div>
+          <div>MEM: ${mem}%</div>
+          <div>NET: ${net} KB/s</div>
+          <div>THR: ${thr}</div>
+          <div>UPT: ${days}d ${hrs}h</div>
+        </div>`;
+    }
+    setInterval(renderStats, 1500);
+    // Throbbing refresh while heavily overclocked — faster tick = more perceived heat
+    setInterval(() => { if (overclockLevel > 4) renderStats(); }, 220);
+
+    // ─────────────────────────────────────────────────────
+    //  FAKE OPERATIONS / PROGRESS BARS
+    // ─────────────────────────────────────────────────────
+    const opsEl = document.getElementById("ops-content");
+    const opLabels = [
+      "DECRYPTING MAINFRAME", "BYPASSING FIREWALL", "ROUTING THROUGH PROXY",
+      "CRACKING HASH", "UPLOADING VIRUS", "TRACING SIGNAL",
+      "SPOOFING MAC ADDR", "INJECTING PAYLOAD", "TUNNELING VPN", "BRUTEFORCING AUTH",
+    ];
+
+    let ops = [
+      { label: opLabels[0], progress: 10 },
+      { label: opLabels[3], progress: 45 },
+    ];
+
+    setInterval(() => {
+      // Tick progress
+      ops = ops.map(o => ({ ...o, progress: Math.min(100, o.progress + Math.random() * 6) }))
+               .filter(o => o.progress < 100);
+
+      // Occasionally add new op
+      if (ops.length < 3 && Math.random() > 0.7) {
+        ops.push({
+          label: opLabels[Math.floor(Math.random() * opLabels.length)],
+          progress: 0,
+        });
+      }
+
+      opsEl.innerHTML = ops.map(o => {
+        const barColor = o.progress > 80 ? "rgba(255,100,0,0.8)" : "rgba(0,255,0,0.6)";
+        return `
+          <div style="margin-bottom:5px;font-family:var(--terminal-font);font-size:9px">
+            <div style="color:#0f0;margin-bottom:1px">${o.label}... ${Math.floor(o.progress)}%</div>
+            <div style="width:100%;height:4px;background:rgba(0,255,0,0.1);border:1px solid rgba(0,255,0,0.3)">
+              <div style="width:${o.progress}%;height:100%;background:${barColor};transition:width 0.2s"></div>
+            </div>
+          </div>`;
+      }).join("");
+    }, 250);
+
+    // ─────────────────────────────────────────────────────
+    //  SERVER GRID // THREAT MAP (semi-3D)
+    // ─────────────────────────────────────────────────────
+    const sgCanvas = document.getElementById("server-grid-canvas");
+    const sgCtx = sgCanvas.getContext("2d");
+    const SG_COLS = 12;
+    const SG_ROWS = 5;
+    // States: 0 offline, 1 idle, 2 transmitting, 3 warning(orange), 4 under-attack(red), 5 compromised(deep red)
+    const sgGrid = Array.from({ length: SG_ROWS }, () =>
+      Array.from({ length: SG_COLS }, () => ({
+        state: Math.random() > 0.15 ? 1 : 0,
+        flicker: 0,
+        pulse: Math.random() * Math.PI * 2,
+      }))
+    );
+    let sgScanX = 0;
+
+    function sizeServerGrid() {
+      const rect = sgCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      sgCanvas.width = rect.width * dpr;
+      sgCanvas.height = rect.height * dpr;
+      sgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    sizeServerGrid();
+    window.addEventListener("resize", sizeServerGrid);
+
+    // Tick state transitions
+    setInterval(() => {
+      for (let r = 0; r < SG_ROWS; r++) {
+        for (let c = 0; c < SG_COLS; c++) {
+          const cell = sgGrid[r][c];
+          const roll = Math.random();
+          switch (cell.state) {
+            case 0: // offline → idle
+              if (roll > 0.985) cell.state = 1;
+              break;
+            case 1: // idle → transmit / warning / direct attack
+              if (roll > 0.96) cell.state = 2;
+              else if (roll > 0.93) cell.state = 3;       // warn (orange)
+              else if (roll > 0.985) cell.state = 4;      // direct attack
+              break;
+            case 2: // transmitting → idle / warning
+              if (roll > 0.92) cell.state = 1;
+              else if (roll > 0.97) cell.state = 3;
+              break;
+            case 3: // warning → escalate / clear
+              if (roll > 0.93) cell.state = 4;            // escalate to attack
+              else if (roll > 0.85) cell.state = 1;       // clear back to idle
+              break;
+            case 4: // under-attack → compromised / de-escalate / clear
+              if (roll > 0.95) cell.state = 5;            // compromised
+              else if (roll > 0.85) cell.state = 3;       // back to warn
+              else if (roll > 0.97) cell.state = 1;
+              break;
+            case 5: // compromised → recover slowly
+              if (roll > 0.94) cell.state = 4;            // bounces back to attack
+              else if (roll > 0.985) cell.state = 1;      // hard recover
+              break;
+          }
+        }
+      }
+      // Occasional "incident burst" — flag a small cluster as warn/attack
+      if (Math.random() > 0.88) {
+        const cr = Math.floor(Math.random() * SG_ROWS);
+        const cc = Math.floor(Math.random() * SG_COLS);
+        const radius = 1 + Math.floor(Math.random() * 2);
+        const sev = Math.random() < 0.5 ? 3 : 4;
+        for (let dr = -radius; dr <= radius; dr++) {
+          for (let dc = -radius; dc <= radius; dc++) {
+            const r = cr + dr, c = cc + dc;
+            if (r >= 0 && r < SG_ROWS && c >= 0 && c < SG_COLS && Math.random() > 0.3) {
+              sgGrid[r][c].state = sev;
+            }
+          }
+        }
+      }
+      // Periodic "scan wave" sweep
+      if (Math.random() > 0.85) sgScanX = 0;
+    }, 220);
+
+    // Render loop
+    setInterval(() => {
+      const w = sgCanvas.clientWidth;
+      const h = sgCanvas.clientHeight;
+      sgCtx.clearRect(0, 0, w, h);
+
+      // Background grid floor (perspective)
+      const horizonY = h * 0.18;
+      const baseY = h * 0.96;
+      sgCtx.strokeStyle = "rgba(0,255,100,0.08)";
+      sgCtx.lineWidth = 0.5;
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        const y = horizonY + (baseY - horizonY) * (t * t);
+        const inset = w * 0.5 * (1 - t);
+        sgCtx.beginPath();
+        sgCtx.moveTo(inset, y);
+        sgCtx.lineTo(w - inset, y);
+        sgCtx.stroke();
+      }
+
+      // Project cell to screen with perspective
+      const project = (col, row) => {
+        const fx = (col + 0.5) / SG_COLS;       // 0..1
+        const fy = (row + 0.5) / SG_ROWS;       // 0..1 (0 = far, 1 = near)
+        const persp = 0.35 + fy * 0.65;          // shrink for far rows
+        const cx = w * 0.5 + (fx - 0.5) * w * persp;
+        const cy = horizonY + (baseY - horizonY) * (fy * fy * 0.85 + fy * 0.15);
+        const size = (Math.min(w / SG_COLS, (baseY - horizonY) / SG_ROWS) * persp) * 0.85;
+        return { cx, cy, size, persp };
+      };
+
+      // Draw cells back-to-front
+      sgScanX = (sgScanX + 0.015) % 1.4;
+      for (let r = 0; r < SG_ROWS; r++) {
+        for (let c = 0; c < SG_COLS; c++) {
+          const cell = sgGrid[r][c];
+          cell.pulse += 0.15;
+          const { cx, cy, size, persp } = project(c, r);
+          const half = size / 2;
+
+          // State color
+          let baseCol, glowCol, alpha;
+          switch (cell.state) {
+            case 0: baseCol = "30,40,30";  glowCol = "0,80,0";    alpha = 0.35; break;
+            case 1: baseCol = "0,255,100"; glowCol = "0,255,100"; alpha = 0.55 + 0.15 * Math.sin(cell.pulse); break;
+            case 2: baseCol = "0,255,200"; glowCol = "0,255,200"; alpha = 0.85 + 0.15 * Math.sin(cell.pulse * 3); break;
+            case 3: baseCol = "255,160,0"; glowCol = "255,170,0"; alpha = 0.7  + 0.25 * Math.abs(Math.sin(cell.pulse * 3)); break;
+            case 4: baseCol = "255,60,40"; glowCol = "255,60,40"; alpha = 0.7  + 0.3  * Math.abs(Math.sin(cell.pulse * 5)); break;
+            case 5: baseCol = "255,0,30";  glowCol = "255,0,60";  alpha = 0.5  + 0.5  * Math.abs(Math.sin(cell.pulse * 8)); break;
+          }
+
+          // Box body
+          sgCtx.shadowColor = `rgba(${glowCol},${alpha})`;
+          sgCtx.shadowBlur = cell.state >= 4 ? 14 : cell.state === 3 ? 10 : 6;
+          sgCtx.fillStyle = `rgba(${baseCol},${alpha * 0.55})`;
+          sgCtx.fillRect(cx - half, cy - half, size, size);
+
+          // Box outline
+          sgCtx.shadowBlur = 0;
+          sgCtx.strokeStyle = `rgba(${baseCol},${Math.min(1, alpha + 0.2)})`;
+          sgCtx.lineWidth = Math.max(0.5, persp * 1.2);
+          sgCtx.strokeRect(cx - half, cy - half, size, size);
+
+          // Top face (3D illusion)
+          const skew = size * 0.18;
+          sgCtx.beginPath();
+          sgCtx.moveTo(cx - half, cy - half);
+          sgCtx.lineTo(cx - half + skew, cy - half - skew);
+          sgCtx.lineTo(cx + half + skew, cy - half - skew);
+          sgCtx.lineTo(cx + half, cy - half);
+          sgCtx.closePath();
+          sgCtx.fillStyle = `rgba(${baseCol},${alpha * 0.35})`;
+          sgCtx.fill();
+          sgCtx.stroke();
+
+          // Right face
+          sgCtx.beginPath();
+          sgCtx.moveTo(cx + half, cy - half);
+          sgCtx.lineTo(cx + half + skew, cy - half - skew);
+          sgCtx.lineTo(cx + half + skew, cy + half - skew);
+          sgCtx.lineTo(cx + half, cy + half);
+          sgCtx.closePath();
+          sgCtx.fillStyle = `rgba(${baseCol},${alpha * 0.25})`;
+          sgCtx.fill();
+          sgCtx.stroke();
+
+          // Inner status dot
+          if (cell.state > 0) {
+            sgCtx.fillStyle = `rgba(${baseCol},${Math.min(1, alpha + 0.3)})`;
+            sgCtx.beginPath();
+            sgCtx.arc(cx, cy, Math.max(1, size * 0.12), 0, Math.PI * 2);
+            sgCtx.fill();
+          }
+        }
+      }
+
+      // Threat lines — amber between warning cells, red between attacked/compromised
+      const warnCells = [];
+      const redCells  = [];
+      for (let r = 0; r < SG_ROWS; r++) {
+        for (let c = 0; c < SG_COLS; c++) {
+          const s = sgGrid[r][c].state;
+          if (s === 3) warnCells.push({ r, c });
+          else if (s >= 4) redCells.push({ r, c });
+        }
+      }
+
+      const drawThreatLines = (cells, midRGB, edgeRGB, count) => {
+        if (cells.length < 2) return;
+        for (let i = 0; i < Math.min(count, cells.length - 1); i++) {
+          const a = cells[i];
+          const b = cells[(i + 1) % cells.length];
+          const pa = project(a.c, a.r);
+          const pb = project(b.c, b.r);
+          const grad = sgCtx.createLinearGradient(pa.cx, pa.cy, pb.cx, pb.cy);
+          grad.addColorStop(0,   `rgba(${edgeRGB},0)`);
+          grad.addColorStop(0.5, `rgba(${midRGB},0.75)`);
+          grad.addColorStop(1,   `rgba(${edgeRGB},0)`);
+          sgCtx.strokeStyle = grad;
+          sgCtx.lineWidth = 1;
+          sgCtx.beginPath();
+          sgCtx.moveTo(pa.cx, pa.cy);
+          sgCtx.lineTo(pb.cx, pb.cy);
+          sgCtx.stroke();
+        }
+      };
+      drawThreatLines(warnCells, "255,180,40", "255,160,0", 3);
+      drawThreatLines(redCells,  "255,80,80",  "255,40,40", 3);
+
+      // Scan wave overlay (vertical sweep)
+      if (sgScanX < 1) {
+        const sx = sgScanX * w;
+        const grad = sgCtx.createLinearGradient(sx - 30, 0, sx + 30, 0);
+        grad.addColorStop(0, "rgba(0,255,150,0)");
+        grad.addColorStop(0.5, "rgba(0,255,150,0.25)");
+        grad.addColorStop(1, "rgba(0,255,150,0)");
+        sgCtx.fillStyle = grad;
+        sgCtx.fillRect(sx - 30, 0, 60, h);
+      }
+    }, 50);
+
+    // ─────────────────────────────────────────────────────
+    //  SYSTEM NOTES // ALERTS PANEL
+    // ─────────────────────────────────────────────────────
+    const notesPanel      = document.getElementById("notes-panel");
+    const notesHeaderText = document.getElementById("notes-header-text");
+    const notesHeadline   = document.getElementById("notes-headline");
+    const notesFeed       = document.getElementById("notes-feed");
+    const SEV_RANK = { info: 0, warn: 1, crit: 2, fatal: 3 };
+    const SEV_LABEL = { info: "NOMINAL", warn: "ELEVATED", crit: "CRITICAL", fatal: "FATAL" };
+
+    const ALERTS = [
+      { msg: "VIRUS SPIKED",            sev: "crit"  },
+      { msg: "BACKTRACING",             sev: "warn"  },
+      { msg: "INTRUDER DETECTED",       sev: "crit"  },
+      { msg: "FIREWALL BREACH",         sev: "crit"  },
+      { msg: "PORT SCAN INCOMING",      sev: "warn"  },
+      { msg: "ZERO-DAY DEPLOYED",       sev: "fatal" },
+      { msg: "ROOT ACCESS COMPROMISED", sev: "fatal" },
+      { msg: "PACKET INJECTION",        sev: "warn"  },
+      { msg: "MITM ATTACK",             sev: "crit"  },
+      { msg: "DDoS WAVE INCOMING",      sev: "crit"  },
+      { msg: "KERNEL PANIC",            sev: "fatal" },
+      { msg: "BUFFER OVERFLOW",         sev: "warn"  },
+      { msg: "ROOTKIT INSTALLED",       sev: "crit"  },
+      { msg: "SSH KEY LEAKED",          sev: "warn"  },
+      { msg: "RANSOMWARE DETECTED",     sev: "fatal" },
+      { msg: "TOR NODE COMPROMISED",    sev: "warn"  },
+      { msg: "TRACE COMPLETE",          sev: "info"  },
+      { msg: "PAYLOAD DELIVERED",       sev: "info"  },
+      { msg: "HONEYPOT TRIPPED",        sev: "warn"  },
+      { msg: "SIGNAL JAMMED",           sev: "warn"  },
+      { msg: "ENCRYPTION BROKEN",       sev: "crit"  },
+      { msg: "MAINFRAME ACCESSED",      sev: "info"  },
+      { msg: "ICE COUNTERMEASURE",      sev: "crit"  },
+      { msg: "DAEMON SPAWNED",          sev: "info"  },
+      { msg: "STACK SMASHED",           sev: "fatal" },
+      { msg: "PRIVILEGE ESCALATED",     sev: "crit"  },
+    ];
+
+    let currentSev = "info";
+    let currentSevAt = 0;
+    const recentAlerts = []; // newest first
+
+    function applyPanelSeverity(sev) {
+      notesPanel.classList.remove("sev-info", "sev-warn", "sev-crit", "sev-fatal");
+      notesPanel.classList.add(`sev-${sev}`);
+      notesHeaderText.textContent = `■ System Notes // Status: ${SEV_LABEL[sev]}`;
+    }
+    applyPanelSeverity("info");
+
+    function setHeadline(text, sev) {
+      notesHeadline.classList.remove("sev-info", "sev-warn", "sev-crit", "sev-fatal");
+      notesHeadline.classList.add(`sev-${sev}`);
+      notesHeadline.textContent = text;
+    }
+
+    function spawnAlert() {
+      const a = ALERTS[Math.floor(Math.random() * ALERTS.length)];
+      const tail = Math.random() > 0.55
+        ? ` [0x${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0").toUpperCase()}]`
+        : "";
+      const ip = Math.random() > 0.5
+        ? ` ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`
+        : "";
+      const full = a.msg + ip + tail;
+
+      // Push onto feed (newest first, cap 6)
+      recentAlerts.unshift({ text: full, sev: a.sev });
+      if (recentAlerts.length > 6) recentAlerts.length = 6;
+
+      const colorBySev = {
+        info:  "rgba(0,255,150,",
+        warn:  "rgba(255,170,0,",
+        crit:  "rgba(255,40,60,",
+        fatal: "rgba(255,0,40,",
+      };
+      notesFeed.innerHTML = recentAlerts.map((e, i) => {
+        const fade = 1 - i * 0.13;
+        return `<div style="color:${colorBySev[e.sev]}${fade.toFixed(2)})">› ${e.text}</div>`;
+      }).join("");
+
+      // Promote panel severity if this alert is more severe (or matches)
+      const now = performance.now();
+      if (SEV_RANK[a.sev] >= SEV_RANK[currentSev] || now - currentSevAt > 5500) {
+        const wasBelowCrit = SEV_RANK[currentSev] < SEV_RANK.crit;
+        currentSev = a.sev;
+        currentSevAt = now;
+        applyPanelSeverity(a.sev);
+        setHeadline(full, a.sev);
+        // Sound the alert horn when we *cross up* into crit/fatal territory.
+        if (wasBelowCrit && SEV_RANK[a.sev] >= SEV_RANK.crit) {
+          playEventSound("escalate", { volume: 0.7 });
+        }
+      }
+    }
+
+    // Spawn cadence
+    function scheduleAlert() {
+      const delay = 1500 + Math.random() * 2400;
+      setTimeout(() => { spawnAlert(); scheduleAlert(); }, delay);
+    }
+    scheduleAlert();
+    // Burst storms
+    setInterval(() => {
+      if (Math.random() > 0.85) {
+        const burst = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < burst; i++) setTimeout(spawnAlert, i * 280);
+      }
+    }, 12000);
+
+    // Decay severity back to nominal when nothing critical for a while
+    setInterval(() => {
+      const idle = performance.now() - currentSevAt;
+      if (idle > 6000 && currentSev !== "info") {
+        // step down one level
+        const order = ["info", "warn", "crit", "fatal"];
+        const next = order[Math.max(0, SEV_RANK[currentSev] - 1)];
+        currentSev = next;
+        currentSevAt = performance.now() - 4000;
+        applyPanelSeverity(currentSev);
+        if (currentSev === "info") setHeadline("SYSTEM NOMINAL", "info");
+      }
+    }, 1500);
+
+    // ─────────────────────────────────────────────────────
+    //  VIRUS UPLOAD + GARBAGE DOWNLOAD PROGRESS
+    // ─────────────────────────────────────────────────────
+    const VIRUS_NAMES = [
+      "trojan.kernel32.exe", "rootkit_v2.payload", "stuxnet_b3.bin",
+      "mimikatz_x64.dll", "cryptolock.bin", "wormtail.payload",
+      "shellcode_0day.asm", "ransom_note.elf", "ice_breaker.bin",
+      "polymorph.x.payload", "blackice_v4.exe", "logic_bomb.so",
+    ];
+    const GARB_NAMES = [
+      "system32_dump.tar.gz", "memdump_0x7fff.bin", "kernel_panic.log",
+      "shadow_passwd.bak", "evidence_03.zip", "router_config.cfg",
+      "secrets.tar.bz2", "audit_trail.dat", "mainframe.iso",
+      "ftp_archive.tar", "blackbox_recorder.bin", "shred_me.dat",
+    ];
+
+    function makeProgress(prefix, namesPool) {
+      const fillEl = document.getElementById(`${prefix}-fill`);
+      const pctEl  = document.getElementById(`${prefix}-pct`);
+      const nameEl = document.getElementById(`${prefix}-name`);
+      let active = null;
+
+      function start() {
+        const name = namesPool[Math.floor(Math.random() * namesPool.length)];
+        const sizeKB = 50 + Math.floor(Math.random() * 9950);
+        const speed = 0.4 + Math.random() * 1.8; // % per tick
+        active = { name, sizeKB, progress: 0, speed };
+        nameEl.textContent = `${prefix === "virus" ? "↑" : "↓"} ${name} (${sizeKB} KB)`;
+      }
+      start();
+
+      setInterval(() => {
+        if (!active) { start(); return; }
+        // Occasional stalls / bursts
+        const jitter = Math.random() < 0.08 ? 0 : Math.random() * active.speed * 2;
+        active.progress = Math.min(100, active.progress + jitter);
+        fillEl.style.width = `${active.progress}%`;
+        pctEl.textContent = `${active.progress.toFixed(1)}%`;
+        if (active.progress >= 100) {
+          // Brief pause, then new file
+          active = null;
+          setTimeout(start, 600 + Math.random() * 1200);
+        }
+      }, 120);
+    }
+    makeProgress("virus", VIRUS_NAMES);
+    makeProgress("garb",  GARB_NAMES);
+
+    // ─────────────────────────────────────────────────────
+    //  TERMINAL GLYPH GLITCHES (visual only — PTY untouched)
+    // ─────────────────────────────────────────────────────
+    const termContainer = document.getElementById("terminal-container");
+    const GLITCH_CHARS = "█▓▒░╣║╗╝╚╔╩╦╠═╬◆◇○●♦♣♠♥@#$%&*<>{}[]/\\|+=ABCDEF0123456789アイウエオカキクケコサシスセソタチツ";
+
+    function spawnCorruptRow() {
+      const row = document.createElement("div");
+      row.className = "term-corrupt-row";
+      const top = 8 + Math.random() * 78; // % from top, avoid extreme edges
+      row.style.top = `${top}%`;
+      const len = 30 + Math.floor(Math.random() * 70);
+      let s = "";
+      for (let i = 0; i < len; i++) s += GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+      row.textContent = s;
+      // Some rows render in a hostile red palette
+      if (Math.random() < 0.2) {
+        row.style.color = "#ff4060";
+        row.style.textShadow = "0 0 6px #ff2244";
+      }
+      termContainer.appendChild(row);
+      setTimeout(() => row.remove(), 220);
+    }
+
+    function fireTerminalGlitch() {
+      const roll = Math.random();
+      if (roll < 0.35) {
+        termContainer.classList.add("glitch-shift");
+        setTimeout(() => termContainer.classList.remove("glitch-shift"), 200);
+      } else if (roll < 0.7) {
+        termContainer.classList.add("glitch-slice");
+        setTimeout(() => termContainer.classList.remove("glitch-slice"), 240);
+        if (Math.random() < 0.5) spawnCorruptRow();
+      } else if (roll < 0.88) {
+        termContainer.classList.add("glitch-fuzz");
+        setTimeout(() => termContainer.classList.remove("glitch-fuzz"), 200);
+      } else {
+        // Stacked corruption burst
+        spawnCorruptRow();
+        setTimeout(spawnCorruptRow, 60);
+        setTimeout(spawnCorruptRow, 130);
+      }
+    }
+
+    function scheduleGlitch() {
+      const delay = 3500 + Math.random() * 5500;
+      setTimeout(() => { fireTerminalGlitch(); scheduleGlitch(); }, delay);
+    }
+    scheduleGlitch();
+
+    // ─────────────────────────────────────────────────────
+    //  SCANLINE FLICKER
+    // ─────────────────────────────────────────────────────
+    const scanlines = document.getElementById("scanlines");
+    setInterval(() => {
+      if (Math.random() > 0.95) {
+        scanlines.style.opacity = "0.6";
+        setTimeout(() => { scanlines.style.opacity = "0.3"; }, 50 + Math.random() * 100);
+      }
+    }, 500);
+
+    // ─────────────────────────────────────────────────────
+    //  INTERACTIVE COUNTERMEASURES
+    // ─────────────────────────────────────────────────────
+    function fireFx(panelEl) {
+      panelEl.classList.remove("fx-fire");
+      // force reflow so the animation restarts on repeat clicks
+      void panelEl.offsetWidth;
+      panelEl.classList.add("fx-fire");
+      setTimeout(() => panelEl.classList.remove("fx-fire"), 700);
+    }
+
+    function injectAlert(text, sev) {
+      recentAlerts.unshift({ text, sev });
+      if (recentAlerts.length > 6) recentAlerts.length = 6;
+      const colorBySev = {
+        info:  "rgba(0,255,150,",
+        warn:  "rgba(255,170,0,",
+        crit:  "rgba(255,40,60,",
+        fatal: "rgba(255,0,40,",
+      };
+      notesFeed.innerHTML = recentAlerts.map((e, i) => {
+        const fade = 1 - i * 0.13;
+        return `<div style="color:${colorBySev[e.sev]}${fade.toFixed(2)})">› ${e.text}</div>`;
+      }).join("");
+      currentSev = sev;
+      currentSevAt = performance.now();
+      applyPanelSeverity(sev);
+      setHeadline(text, sev);
+    }
+
+    // Server Grid → DEPLOY COUNTERMEASURES (heal all cells to idle/green)
+    document.getElementById("btn-deploy-cm").addEventListener("click", () => {
+      for (let r = 0; r < SG_ROWS; r++)
+        for (let c = 0; c < SG_COLS; c++)
+          sgGrid[r][c].state = 1;
+      sgScanX = 0;
+      fireFx(document.querySelector("#bottom .panel:nth-child(2)"));
+      playEventSound("deploy", { volume: 0.75 });
+      injectAlert("COUNTERMEASURES DEPLOYED — GRID PURGED", "info");
+    });
+
+    // Globe → SCRAMBLE (flip every connection back to friendly + reroute)
+    document.getElementById("btn-scramble").addEventListener("click", () => {
+      connections.forEach(c => {
+        c.hostile = false;
+        c.lat1 = (Math.random() - 0.5) * Math.PI;
+        c.lon1 = Math.random() * Math.PI * 2;
+        c.lat2 = (Math.random() - 0.5) * Math.PI;
+        c.lon2 = Math.random() * Math.PI * 2;
+      });
+      fireFx(document.getElementById("globe-panel"));
+      playEventSound("scramble", { volume: 0.7 });
+      injectAlert("NETWORK ROUTES SCRAMBLED — TRACE LOST", "info");
+    });
+
+    // Operations → EXEC ALL (instantly complete every running op)
+    document.getElementById("btn-execute-all").addEventListener("click", () => {
+      ops.forEach(o => o.progress = 100);
+      fireFx(document.getElementById("ops-panel"));
+      playEventSound("execute", { volume: 0.7 });
+      injectAlert("ALL OPERATIONS EXECUTED — STACK FLUSHED", "info");
+    });
+
+    // System Notes → PURGE (wipe the alert feed and reset severity)
+    document.getElementById("btn-purge").addEventListener("click", () => {
+      recentAlerts.length = 0;
+      notesFeed.innerHTML = "";
+      currentSev = "info";
+      currentSevAt = performance.now();
+      applyPanelSeverity("info");
+      setHeadline("SYSTEM NOMINAL", "info");
+      fireFx(notesPanel);
+      playEventSound("purge", { volume: 0.8 });
+    });
+
+    // Stats → OVERCLOCK (cumulative; mash to redline the systems)
+    let overclockLevel = 0;
+    const OC_MAX = 10;
+    const statsPanel = document.getElementById("stats-panel");
+    const ocBtn      = document.getElementById("btn-overclock");
+
+    document.getElementById("btn-overclock").addEventListener("click", () => {
+      // Diminishing returns: each press adds less as we climb toward max.
+      const add = 2.2 * (1 - overclockLevel / (OC_MAX + 1.5));
+      overclockLevel = Math.min(OC_MAX, overclockLevel + Math.max(0.25, add));
+      fireFx(statsPanel);
+
+      // Pitch the overclock whine higher as the level climbs — feels strained
+      const t = overclockLevel / OC_MAX;
+      playEventSound("overclock", {
+        volume: 0.6 + t * 0.25,
+        playbackRate: 0.85 + t * 0.7,    // ~0.85 → ~1.55
+      });
+
+      // Escalating feedback messages
+      let sev = "info", msg = "CPU OVERCLOCK ENGAGED — VOLTAGE RAISED";
+      if (overclockLevel > 8.5)      { sev = "fatal"; msg = "REDLINE — SILICON MELTING — CONTAINMENT FAILING"; }
+      else if (overclockLevel > 6.5) { sev = "crit";  msg = "THERMAL LIMIT EXCEEDED — THROTTLING DISABLED"; }
+      else if (overclockLevel > 3.5) { sev = "warn";  msg = "CLOCK MULTIPLIER DOUBLED — TEMP CRITICAL"; }
+      injectAlert(msg, sev);
+    });
+
+    // Decay: gradually bleeds off so the user feels heat fade.
+    setInterval(() => {
+      if (overclockLevel > 0) {
+        overclockLevel = Math.max(0, overclockLevel - 0.04 - overclockLevel * 0.005);
+      }
+    }, 100);
+
+    // Fast tick — keeps the panel chrome (border/glow/bg) tracking the level.
+    function ocColor(t) {
+      // 0 → bright green, 0.5 → amber, 1 → blood red
+      let r, g, b;
+      if (t < 0.5) {
+        const k = t / 0.5;
+        r = Math.round(0   + k * 255);
+        g = Math.round(255 - k * 85);
+        b = Math.round(100 - k * 100);
+      } else {
+        const k = (t - 0.5) / 0.5;
+        r = 255;
+        g = Math.round(170 - k * 150);
+        b = Math.round(0   + k * 30);
+      }
+      return { r, g, b };
+    }
+    setInterval(() => {
+      const t = overclockLevel / OC_MAX;
+      const { r, g, b } = ocColor(t);
+      const a1 = 0.35 + t * 0.6;
+      const a2 = 0.65 + t * 0.25;
+      statsPanel.style.borderColor = `rgba(${r},${g},${b},${a1})`;
+      statsPanel.style.background  = `rgba(${Math.round(r*0.18)},${Math.round(g*0.1)},${Math.round(b*0.1)},${a2})`;
+      statsPanel.style.boxShadow   =
+        `inset 0 0 ${28 * t + 4}px rgba(${r},${g},${b},${0.45 * t + 0.05}), ` +
+        `0 0 ${22 * t}px rgba(${r},${g},${b},${0.55 * t})`;
+      // Mild jitter at the top end
+      if (t > 0.55) {
+        const j = (t - 0.55) / 0.45;
+        const dx = (Math.random() - 0.5) * j * 4;
+        const dy = (Math.random() - 0.5) * j * 4;
+        statsPanel.style.transform = `translate(${dx.toFixed(2)}px,${dy.toFixed(2)}px)`;
+      } else {
+        statsPanel.style.transform = "";
+      }
+      // Button itself reflects danger level
+      ocBtn.style.borderColor = `rgba(${r},${g},${b},${0.55 + t * 0.4})`;
+      ocBtn.style.color       = `rgb(${r},${g},${b})`;
+      ocBtn.style.boxShadow   = `0 0 ${10 * t}px rgba(${r},${g},${b},${0.6 * t})`;
+    }, 60);
+
+  </script>
+</body>
+</html>
