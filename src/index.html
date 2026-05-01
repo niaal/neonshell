@@ -92,6 +92,7 @@
       padding: 6px;
       min-height: 0;
     }
+    .panel-body--canvas { padding: 2px; }
 
     /* ── Interactive HACK buttons ──────────────────────── */
     .hack-btn {
@@ -376,19 +377,18 @@
     /* ── Hacker Chat Toasts ─────────────────────────────── */
     #chat-layer {
       position: fixed;
-      top: 32px;                /* sit just below the panel header band */
+      top: 32px;
       right: 12px;
       width: 300px;
       max-width: 28vw;
       pointer-events: none;
       z-index: 55;
       display: flex;
-      flex-direction: column-reverse; /* newest at the top of the stack */
+      flex-direction: column-reverse;
       gap: 6px;
     }
 
     .chat-toast {
-      pointer-events: none;
       background: rgba(0,15,5,0.85);
       border: 1px solid rgba(0,255,120,0.5);
       border-right-width: 3px;
@@ -610,7 +610,7 @@
     <div id="bottom">
       <div class="panel" id="matrix-panel">
         <div class="panel-header"><span>■ Datastream // Matrix</span></div>
-        <div class="panel-body" style="padding:2px;">
+        <div class="panel-body panel-body--canvas">
           <canvas id="matrix-canvas"></canvas>
         </div>
       </div>
@@ -619,7 +619,7 @@
           <span>■ Server Grid // Threat Map</span>
           <button class="hack-btn" id="btn-deploy-cm">DEPLOY CM</button>
         </div>
-        <div class="panel-body" style="padding:2px;">
+        <div class="panel-body panel-body--canvas">
           <canvas id="server-grid-canvas"></canvas>
         </div>
       </div>
@@ -647,6 +647,21 @@
   <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script>
+    // ─── Shared utilities ────────────────────────────────
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const randomByte = () => Math.floor(Math.random() * 256);
+    const randomIPv4 = () => `${randomByte()}.${randomByte()}.${randomByte()}.${randomByte()}`;
+    const randomHex = (bytes) =>
+      Math.floor(Math.random() * Math.pow(16, bytes * 2))
+        .toString(16).padStart(bytes * 2, "0").toUpperCase();
+    function scheduleRecurring(fn, minMs, maxMs) {
+      const tick = () => {
+        fn();
+        setTimeout(tick, minMs + Math.random() * (maxMs - minMs));
+      };
+      setTimeout(tick, minMs + Math.random() * (maxMs - minMs));
+    }
+
     // ─────────────────────────────────────────────────────
     //  XTERM.JS TERMINAL
     // ─────────────────────────────────────────────────────
@@ -789,9 +804,7 @@
       if (now - lastKeyTime < 28) return;   // autorepeat throttle
       lastKeyTime = now;
 
-      const file = isEnter
-        ? "enter.wav"
-        : KEY_SOUNDS[Math.floor(Math.random() * KEY_SOUNDS.length)];
+      const file = isEnter ? "enter.wav" : pick(KEY_SOUNDS);
       const pool = sfxPools[file];
       if (!pool) return;
 
@@ -873,8 +886,10 @@
     const matrixCanvas = document.getElementById("matrix-canvas");
     const matrixCtx = matrixCanvas.getContext("2d");
     const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF@#$%&*<>{}[]";
-    let matrixColumns = [];
     const MATRIX_FONT_SIZE = 13;
+    let matrixColumns = [];
+    let matrixW = 0;
+    let matrixH = 0;
 
     function resizeMatrix() {
       const rect = matrixCanvas.getBoundingClientRect();
@@ -882,28 +897,31 @@
       matrixCanvas.width  = Math.max(1, Math.floor(rect.width  * dpr));
       matrixCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
       matrixCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      matrixCtx.font = `bold ${MATRIX_FONT_SIZE}px monospace`;
+      matrixW = rect.width;
+      matrixH = rect.height;
       const cols = Math.max(1, Math.floor(rect.width / MATRIX_FONT_SIZE));
-      matrixColumns = Array.from({ length: cols }, () =>
-        Math.floor(Math.random() * (rect.height / MATRIX_FONT_SIZE))
-      );
+      // Preserve existing column y-positions when col count is unchanged
+      // (avoids visible reset on spurious sub-pixel resize observations).
+      if (matrixColumns.length !== cols) {
+        matrixColumns = Array.from({ length: cols }, () =>
+          Math.floor(Math.random() * (rect.height / MATRIX_FONT_SIZE))
+        );
+      }
     }
     resizeMatrix();
-    window.addEventListener("resize", resizeMatrix);
     if (window.ResizeObserver) {
-      new ResizeObserver(() => resizeMatrix()).observe(matrixCanvas);
+      new ResizeObserver(resizeMatrix).observe(matrixCanvas);
+    } else {
+      window.addEventListener("resize", resizeMatrix);
     }
 
     setInterval(() => {
-      const fontSize = MATRIX_FONT_SIZE;
-      const w = matrixCanvas.clientWidth;
-      const h = matrixCanvas.clientHeight;
-      // Slightly stronger trail fade now that the panel is small/contained.
       matrixCtx.fillStyle = "rgba(0,0,0,0.08)";
-      matrixCtx.fillRect(0, 0, w, h);
-      matrixCtx.font = `bold ${fontSize}px monospace`;
+      matrixCtx.fillRect(0, 0, matrixW, matrixH);
 
-      matrixColumns.forEach((y, i) => {
-        const char = chars[Math.floor(Math.random() * chars.length)];
+      for (let i = 0; i < matrixColumns.length; i++) {
+        const y = matrixColumns[i];
         const b = Math.random();
         if (b > 0.97) {
           matrixCtx.shadowColor = "#0f0";
@@ -917,14 +935,14 @@
           matrixCtx.shadowBlur = 0;
           matrixCtx.fillStyle = `rgba(0,255,80,${0.55 + b * 0.4})`;
         }
-        matrixCtx.fillText(char, i * fontSize, y * fontSize);
+        matrixCtx.fillText(pick(chars), i * MATRIX_FONT_SIZE, y * MATRIX_FONT_SIZE);
 
-        if (y * fontSize > h && Math.random() > 0.975) {
+        if (y * MATRIX_FONT_SIZE > matrixH && Math.random() > 0.975) {
           matrixColumns[i] = 0;
         } else {
           matrixColumns[i] = y + 1;
         }
-      });
+      }
       matrixCtx.shadowBlur = 0;
     }, 50);
 
@@ -1163,12 +1181,9 @@
     let netEntries = [];
 
     setInterval(() => {
-      const ip = () => `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
-      const proto = protocols[Math.floor(Math.random() * protocols.length)];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
       const port1 = Math.floor(Math.random() * 65535);
       const port2 = Math.floor(Math.random() * 65535);
-      netEntries.push(`${proto} ${ip()}:${port1} → ${ip()}:${port2} [${status}]`);
+      netEntries.push(`${pick(protocols)} ${randomIPv4()}:${port1} → ${randomIPv4()}:${port2} [${pick(statuses)}]`);
       if (netEntries.length > 9) netEntries = netEntries.slice(-9);
 
       netEl.innerHTML = netEntries.map((e, i) => {
@@ -1238,10 +1253,7 @@
 
       // Occasionally add new op
       if (ops.length < 3 && Math.random() > 0.7) {
-        ops.push({
-          label: opLabels[Math.floor(Math.random() * opLabels.length)],
-          progress: 0,
-        });
+        ops.push({ label: pick(opLabels), progress: 0 });
       }
 
       opsEl.innerHTML = ops.map(o => {
@@ -1536,13 +1548,9 @@
     }
 
     function spawnAlert() {
-      const a = ALERTS[Math.floor(Math.random() * ALERTS.length)];
-      const tail = Math.random() > 0.55
-        ? ` [0x${Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0").toUpperCase()}]`
-        : "";
-      const ip = Math.random() > 0.5
-        ? ` ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`
-        : "";
+      const a = pick(ALERTS);
+      const tail = Math.random() > 0.55 ? ` [0x${randomHex(3)}]` : "";
+      const ip   = Math.random() > 0.5  ? ` ${randomIPv4()}` : "";
       const full = a.msg + ip + tail;
 
       // Push onto feed (newest first, cap 6)
@@ -1576,11 +1584,7 @@
     }
 
     // Spawn cadence
-    function scheduleAlert() {
-      const delay = 1500 + Math.random() * 2400;
-      setTimeout(() => { spawnAlert(); scheduleAlert(); }, delay);
-    }
-    scheduleAlert();
+    scheduleRecurring(spawnAlert, 1500, 3900);
     // Burst storms
     setInterval(() => {
       if (Math.random() > 0.85) {
@@ -1626,9 +1630,9 @@
       let active = null;
 
       function start() {
-        const name = namesPool[Math.floor(Math.random() * namesPool.length)];
+        const name = pick(namesPool);
         const sizeKB = 50 + Math.floor(Math.random() * 9950);
-        const speed = 0.4 + Math.random() * 1.8; // % per tick
+        const speed = 0.4 + Math.random() * 1.8;   // % per tick
         active = { name, sizeKB, progress: 0, speed };
         nameEl.textContent = `${prefix === "virus" ? "↑" : "↓"} ${name} (${sizeKB} KB)`;
       }
@@ -1664,7 +1668,7 @@
       row.style.top = `${top}%`;
       const len = 30 + Math.floor(Math.random() * 70);
       let s = "";
-      for (let i = 0; i < len; i++) s += GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+      for (let i = 0; i < len; i++) s += pick(GLITCH_CHARS);
       row.textContent = s;
       // Some rows render in a hostile red palette
       if (Math.random() < 0.2) {
@@ -1695,11 +1699,7 @@
       }
     }
 
-    function scheduleGlitch() {
-      const delay = 3500 + Math.random() * 5500;
-      setTimeout(() => { fireTerminalGlitch(); scheduleGlitch(); }, delay);
-    }
-    scheduleGlitch();
+    scheduleRecurring(fireTerminalGlitch, 3500, 9000);
 
     // ─────────────────────────────────────────────────────
     //  HACKER CHAT TOASTS
@@ -1733,17 +1733,17 @@
       { text: "they triangulated the proxy. moving to fallback.", tone: "danger" },
 
       // bragging / confidence
-      { text: "owned. rootkit deployed on {target} — payload hot.", tone: "" },
-      { text: "lol they didn't even rotate the SSH keys since 2019", tone: "" },
-      { text: "got the source. uploading to the dead drop.", tone: "" },
-      { text: "kerberos golden ticket minted. domain admin in 4mins.", tone: "" },
-      { text: "shadow file dumped — cracking now, ETA 12min", tone: "" },
-      { text: "no auth on port 8443. amateur hour.", tone: "" },
-      { text: "RDP open to the world. literally.", tone: "" },
-      { text: "telnet?? in this economy?? lmao", tone: "" },
-      { text: "mailserver was one CVE away from collapsing on its own", tone: "" },
-      { text: "10 lines of bash and they've lost the firewall", tone: "" },
-      { text: "vendor backdoor STILL open. christmas came early.", tone: "" },
+      { text: "owned. rootkit deployed on {target} — payload hot." },
+      { text: "lol they didn't even rotate the SSH keys since 2019" },
+      { text: "got the source. uploading to the dead drop." },
+      { text: "kerberos golden ticket minted. domain admin in 4mins." },
+      { text: "shadow file dumped — cracking now, ETA 12min" },
+      { text: "no auth on port 8443. amateur hour." },
+      { text: "RDP open to the world. literally." },
+      { text: "telnet?? in this economy?? lmao" },
+      { text: "mailserver was one CVE away from collapsing on its own" },
+      { text: "10 lines of bash and they've lost the firewall" },
+      { text: "vendor backdoor STILL open. christmas came early." },
 
       // operational chatter
       { text: "tunneling DNS over the satellite uplink", tone: "cyan" },
@@ -1760,16 +1760,16 @@
       { text: "spoofed MAC, rotating again in 60s", tone: "cyan" },
 
       // banter
-      { text: "anyone else getting weird latency tonight?", tone: "" },
-      { text: "the matrix has me. literally. someone yank the cable.", tone: "" },
-      { text: "tea break? been at this 36 hours.", tone: "" },
+      { text: "anyone else getting weird latency tonight?" },
+      { text: "the matrix has me. literally. someone yank the cable." },
+      { text: "tea break? been at this 36 hours." },
       { text: "stop typing during my exfil!! creates EM noise.", tone: "warn" },
       { text: "did anyone touch my screen session??", tone: "warn" },
-      { text: "remember when this was a fun hobby", tone: "" },
-      { text: "yeah real cool, you 'broke' the rate limiter. it's localhost.", tone: "" },
+      { text: "remember when this was a fun hobby" },
+      { text: "yeah real cool, you 'broke' the rate limiter. it's localhost." },
       { text: "who's piggybacking on my tor circuit", tone: "warn" },
-      { text: "free pizza if anyone has a working 0day for cisco", tone: "" },
-      { text: "if you see traffic on 31337 that's me, don't kill it", tone: "" },
+      { text: "free pizza if anyone has a working 0day for cisco" },
+      { text: "if you see traffic on 31337 that's me, don't kill it" },
 
       // alarming
       { text: "kernel panic on the C&C box — fallback engaging", tone: "danger" },
@@ -1783,86 +1783,77 @@
       // technical theatre
       { text: "running nmap -A on {target}, 8 ports open", tone: "cyan" },
       { text: "iptables flush incoming, hold the line", tone: "cyan" },
-      { text: "found a buffer overflow in their auth daemon", tone: "" },
+      { text: "found a buffer overflow in their auth daemon" },
       { text: "the schema's a mess but I can pivot from here", tone: "cyan" },
-      { text: "salted hashes? cute. running the rainbow tables.", tone: "" },
-      { text: "their CSP is just `*` — XSS heaven", tone: "" },
+      { text: "salted hashes? cute. running the rainbow tables." },
+      { text: "their CSP is just `*` — XSS heaven" },
       { text: "pcap shows beacon every 47s, that's the C2", tone: "cyan" },
-      { text: "uploading shellcode to /tmp/.x — they'll never look there", tone: "" },
-      { text: "race condition in the login form. classic.", tone: "" },
-      { text: "their git history has the api keys. unbelievable.", tone: "" },
-      { text: "found the .env in the public S3 bucket", tone: "" },
-      { text: "chmod 777 on production. who hurt them.", tone: "" },
+      { text: "uploading shellcode to /tmp/.x — they'll never look there" },
+      { text: "race condition in the login form. classic." },
+      { text: "their git history has the api keys. unbelievable." },
+      { text: "found the .env in the public S3 bucket" },
+      { text: "chmod 777 on production. who hurt them." },
 
       // closing / signing off
-      { text: "extracted clean. handing the relay to the next shift.", tone: "" },
-      { text: "going dark. ping me on the back channel.", tone: "" },
-      { text: "wiped my tracks, see you in 6 weeks.", tone: "" },
+      { text: "extracted clean. handing the relay to the next shift." },
+      { text: "going dark. ping me on the back channel." },
+      { text: "wiped my tracks, see you in 6 weeks." },
       { text: "all yours, leaving the proxy hot for 10min", tone: "cyan" },
-      { text: "drop's confirmed. payment in monero.", tone: "" },
+      { text: "drop's confirmed. payment in monero." },
 
       // misc film-ish
-      { text: "hack the planet.", tone: "" },
-      { text: "they used 'password1'. they DESERVE this.", tone: "" },
-      { text: "remember: there is no spoon", tone: "" },
-      { text: "zero cool was here", tone: "" },
-      { text: "I'm not a script kiddie I just LOOK like one", tone: "" },
+      { text: "hack the planet." },
+      { text: "they used 'password1'. they DESERVE this." },
+      { text: "remember: there is no spoon" },
+      { text: "zero cool was here" },
+      { text: "I'm not a script kiddie I just LOOK like one" },
     ];
 
+    const FAKE_HOSTS = [
+      "mainframe.langley", "darknet-relay-7", "gibson", "ellingson-mil",
+      "cyberdyne.local", "tyrell.corp", "pentagon-vpn", "sublimit.io",
+      "blackmesa.tld", "pyramid.gov", "node-313.dn", "nx-station-3",
+    ];
     function randomTarget() {
       const r = Math.random();
-      if (r < 0.4) {
-        return `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
-      }
-      if (r < 0.7) {
-        const hosts = ["mainframe.langley", "darknet-relay-7", "gibson", "ellingson-mil",
-                       "cyberdyne.local", "tyrell.corp", "pentagon-vpn", "sublimit.io",
-                       "blackmesa.tld", "pyramid.gov", "node-313.dn", "nx-station-3"];
-        return hosts[Math.floor(Math.random() * hosts.length)];
-      }
-      return `[${Math.floor(Math.random()*0xffff).toString(16)}::${Math.floor(Math.random()*0xffff).toString(16)}]`;
+      if (r < 0.4) return randomIPv4();
+      if (r < 0.7) return pick(FAKE_HOSTS);
+      return `[${randomHex(2).toLowerCase()}::${randomHex(2).toLowerCase()}]`;
     }
 
+    const TOAST_MAX_VISIBLE = 5;
     function spawnChatToast() {
-      const handle = HACKER_HANDLES[Math.floor(Math.random() * HACKER_HANDLES.length)];
-      const line = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+      const line = pick(CHAT_LINES);
       const text = line.text.replace(/\{target\}/g, randomTarget());
 
       const el = document.createElement("div");
-      el.className = "chat-toast" + (line.tone ? ` tone-${line.tone}` : "");
+      el.className = line.tone ? `chat-toast tone-${line.tone}` : "chat-toast";
       const handleEl = document.createElement("span");
       handleEl.className = "chat-handle";
-      handleEl.textContent = handle;
+      handleEl.textContent = pick(HACKER_HANDLES);
       el.appendChild(handleEl);
       el.appendChild(document.createTextNode(" " + text));
+      // Self-remove when the CSS slide-out animation completes — keeps node
+      // lifetime tied to the actual animation, no magic-number setTimeout.
+      el.addEventListener("animationend", (ev) => {
+        if (ev.animationName === "chat-toast-out") el.remove();
+      });
       chatLayer.appendChild(el);
-
-      // Cap visible toasts so the stack doesn't run away
-      while (chatLayer.children.length > 5) {
+      while (chatLayer.children.length > TOAST_MAX_VISIBLE) {
         chatLayer.removeChild(chatLayer.firstChild);
       }
-      // Hard removal after the CSS-out animation completes (~5.05s total)
-      setTimeout(() => el.remove(), 5200);
     }
 
-    function scheduleChat() {
-      // Base cadence: 4–11s between solo messages.
-      const delay = 4000 + Math.random() * 7000;
-      setTimeout(() => {
-        spawnChatToast();
-        // Occasional chain: 2–4 messages quick-fire (different handles)
-        if (Math.random() < 0.18) {
-          const burst = 1 + Math.floor(Math.random() * 3);
-          for (let i = 0; i < burst; i++) {
-            setTimeout(spawnChatToast, 600 + i * (500 + Math.random() * 700));
-          }
-        }
-        scheduleChat();
-      }, delay);
+    function spawnChatBurst() {
+      spawnChatToast();
+      if (Math.random() >= 0.18) return;
+      const burst = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < burst; i++) {
+        setTimeout(spawnChatToast, 600 + i * (500 + Math.random() * 700));
+      }
     }
-    scheduleChat();
-    // Seed the screen with one early so it's visible quickly
-    setTimeout(spawnChatToast, 1200);
+    scheduleRecurring(spawnChatBurst, 4000, 11000);
+    setTimeout(spawnChatToast, 1200);   // seed one quickly so the screen isn't empty
 
     // ─────────────────────────────────────────────────────
     //  SCANLINE FLICKER
