@@ -43,13 +43,15 @@
     /* ── Layout ─────────────────────────────────────────── */
     #app {
       display: grid;
-      grid-template-columns: 1fr 210px;
-      grid-template-rows: 1fr 185px;
+      grid-template-columns: 1fr 260px;
+      grid-template-rows: 1fr 230px;
       gap: 4px;
       padding: 4px;
       height: 100vh;
       position: relative;
       z-index: 10;
+      /* CRT phosphor softness — a touch of blur, slight saturation/contrast lift */
+      filter: blur(0.45px) saturate(1.18) contrast(1.06);
     }
 
     .panel {
@@ -324,16 +326,43 @@
     }
 
     /* ── CRT Effects Layer ─────────────────────────────── */
+    /* RGB shadow-mask: the visible "phosphor pixel" sub-stripe pattern */
+    #shadow-mask {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 49;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(255, 50, 50, 0.22) 0px,
+          rgba(255, 50, 50, 0.22) 1px,
+          rgba(50, 255, 50, 0.22) 1px,
+          rgba(50, 255, 50, 0.22) 2px,
+          rgba(50, 80, 255, 0.22) 2px,
+          rgba(50, 80, 255, 0.22) 3px
+        ),
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0)        0px,
+          rgba(0, 0, 0, 0)        2px,
+          rgba(0, 0, 0, 0.18)     2px,
+          rgba(0, 0, 0, 0.18)     3px
+        );
+      mix-blend-mode: multiply;
+      opacity: 0.65;
+    }
+
     #scanlines {
       position: fixed;
       inset: 0;
       background: repeating-linear-gradient(
         0deg, transparent, transparent 1px,
-        rgba(0,0,0,0.12) 1px, rgba(0,0,0,0.12) 2px
+        rgba(0,0,0,0.18) 1px, rgba(0,0,0,0.18) 2px
       );
       pointer-events: none;
       z-index: 50;
-      opacity: 0.3;
+      opacity: 0.4;
     }
 
     #vignette {
@@ -342,6 +371,63 @@
       background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%);
       pointer-events: none;
       z-index: 51;
+    }
+
+    /* ── Hacker Chat Toasts ─────────────────────────────── */
+    #chat-layer {
+      position: fixed;
+      top: 32px;                /* sit just below the panel header band */
+      right: 12px;
+      width: 300px;
+      max-width: 28vw;
+      pointer-events: none;
+      z-index: 55;
+      display: flex;
+      flex-direction: column-reverse; /* newest at the top of the stack */
+      gap: 6px;
+    }
+
+    .chat-toast {
+      pointer-events: none;
+      background: rgba(0,15,5,0.85);
+      border: 1px solid rgba(0,255,120,0.5);
+      border-right-width: 3px;
+      padding: 5px 9px 6px;
+      font-family: var(--terminal-font);
+      font-size: 11px;
+      color: #aaffaa;
+      box-shadow: 0 0 12px rgba(0,255,120,0.18), inset 0 0 18px rgba(0,255,120,0.06);
+      animation: chat-toast-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+                 chat-toast-out 0.45s ease-in 4.6s both;
+      transform-origin: right center;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    .chat-toast .chat-handle {
+      color: #00ff99;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-right: 6px;
+      text-shadow: 0 0 6px rgba(0,255,120,0.55);
+    }
+    .chat-toast .chat-handle::before { content: "<"; opacity: 0.6; }
+    .chat-toast .chat-handle::after  { content: ">"; opacity: 0.6; }
+
+    /* Some users render in different palettes for variety */
+    .chat-toast.tone-warn    { border-color: rgba(255,170,0,0.6); color: #ffd070; box-shadow: 0 0 12px rgba(255,170,0,0.2); }
+    .chat-toast.tone-warn .chat-handle { color: #ffaa00; text-shadow: 0 0 6px rgba(255,170,0,0.6); }
+    .chat-toast.tone-danger  { border-color: rgba(255,60,80,0.7); color: #ffaaaa; box-shadow: 0 0 14px rgba(255,60,80,0.28); }
+    .chat-toast.tone-danger .chat-handle { color: #ff4060; text-shadow: 0 0 6px rgba(255,60,80,0.7); }
+    .chat-toast.tone-cyan    { border-color: rgba(0,200,255,0.55); color: #aaeaff; box-shadow: 0 0 12px rgba(0,200,255,0.22); }
+    .chat-toast.tone-cyan .chat-handle { color: #00d0ff; text-shadow: 0 0 6px rgba(0,200,255,0.6); }
+
+    @keyframes chat-toast-in {
+      from { opacity: 0; transform: translateX(20px) skewX(6deg); }
+      to   { opacity: 1; transform: translateX(0)    skewX(0deg); }
+    }
+    @keyframes chat-toast-out {
+      from { opacity: 1; transform: translateX(0); }
+      to   { opacity: 0; transform: translateX(12px); }
     }
 
     /* CRT scan beam — a soft horizontal band slowly sweeping down the screen */
@@ -369,12 +455,11 @@
       100% { transform: translateY(100vh); }
     }
 
-    /* ── Matrix Rain Background ────────────────────────── */
-    #matrix-bg {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      opacity: 0.55;
+    /* ── Matrix Rain (in-panel) ─────────────────────────── */
+    #matrix-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
 
     /* ── Access Overlay ────────────────────────────────── */
@@ -462,10 +547,8 @@
 </head>
 <body>
 
-  <!-- Background matrix rain -->
-  <canvas id="matrix-bg"></canvas>
-
   <!-- CRT overlays -->
+  <div id="shadow-mask"></div>
   <div id="scanlines"></div>
   <div id="crt-scan"></div>
   <div id="vignette"></div>
@@ -474,6 +557,9 @@
   <div id="access-overlay">
     <div id="access-text"></div>
   </div>
+
+  <!-- Hacker chat toasts -->
+  <div id="chat-layer"></div>
 
   <!-- Main layout -->
   <div id="app">
@@ -522,9 +608,11 @@
 
     <!-- Bottom panels -->
     <div id="bottom">
-      <div class="panel">
-        <div class="panel-header"><span>■ Memory Dump</span></div>
-        <div class="panel-body" id="hexdump-content"></div>
+      <div class="panel" id="matrix-panel">
+        <div class="panel-header"><span>■ Datastream // Matrix</span></div>
+        <div class="panel-body" style="padding:2px;">
+          <canvas id="matrix-canvas"></canvas>
+        </div>
       </div>
       <div class="panel">
         <div class="panel-header">
@@ -780,58 +868,65 @@
     }
 
     // ─────────────────────────────────────────────────────
-    //  MATRIX RAIN BACKGROUND
+    //  MATRIX RAIN (in-panel)
     // ─────────────────────────────────────────────────────
-    const matrixCanvas = document.getElementById("matrix-bg");
+    const matrixCanvas = document.getElementById("matrix-canvas");
     const matrixCtx = matrixCanvas.getContext("2d");
     const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF@#$%&*<>{}[]";
     let matrixColumns = [];
+    const MATRIX_FONT_SIZE = 13;
 
-    const MATRIX_FONT_SIZE = 16;
     function resizeMatrix() {
-      matrixCanvas.width = window.innerWidth;
-      matrixCanvas.height = window.innerHeight;
-      const cols = Math.floor(matrixCanvas.width / MATRIX_FONT_SIZE);
+      const rect = matrixCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      matrixCanvas.width  = Math.max(1, Math.floor(rect.width  * dpr));
+      matrixCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      matrixCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const cols = Math.max(1, Math.floor(rect.width / MATRIX_FONT_SIZE));
       matrixColumns = Array.from({ length: cols }, () =>
-        Math.floor(Math.random() * (matrixCanvas.height / MATRIX_FONT_SIZE))
+        Math.floor(Math.random() * (rect.height / MATRIX_FONT_SIZE))
       );
     }
     resizeMatrix();
     window.addEventListener("resize", resizeMatrix);
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => resizeMatrix()).observe(matrixCanvas);
+    }
 
     setInterval(() => {
       const fontSize = MATRIX_FONT_SIZE;
-      // Lower trail-fade alpha → characters linger longer and the column tails are visible.
-      matrixCtx.fillStyle = "rgba(0,0,0,0.04)";
-      matrixCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+      const w = matrixCanvas.clientWidth;
+      const h = matrixCanvas.clientHeight;
+      // Slightly stronger trail fade now that the panel is small/contained.
+      matrixCtx.fillStyle = "rgba(0,0,0,0.08)";
+      matrixCtx.fillRect(0, 0, w, h);
       matrixCtx.font = `bold ${fontSize}px monospace`;
 
       matrixColumns.forEach((y, i) => {
         const char = chars[Math.floor(Math.random() * chars.length)];
         const b = Math.random();
         if (b > 0.97) {
-          // Bright white head with glow
           matrixCtx.shadowColor = "#0f0";
-          matrixCtx.shadowBlur = 12;
+          matrixCtx.shadowBlur = 10;
           matrixCtx.fillStyle = "#fff";
         } else if (b > 0.6) {
           matrixCtx.shadowColor = "#0f0";
-          matrixCtx.shadowBlur = 6;
+          matrixCtx.shadowBlur = 5;
           matrixCtx.fillStyle = "#00ff66";
         } else {
           matrixCtx.shadowBlur = 0;
-          matrixCtx.fillStyle = `rgba(0,255,80,${0.6 + b * 0.4})`;
+          matrixCtx.fillStyle = `rgba(0,255,80,${0.55 + b * 0.4})`;
         }
         matrixCtx.fillText(char, i * fontSize, y * fontSize);
 
-        if (y * fontSize > matrixCanvas.height && Math.random() > 0.975) {
+        if (y * fontSize > h && Math.random() > 0.975) {
           matrixColumns[i] = 0;
         } else {
           matrixColumns[i] = y + 1;
         }
       });
       matrixCtx.shadowBlur = 0;
-    }, 45);
+    }, 50);
 
     // ─────────────────────────────────────────────────────
     //  WIREFRAME GLOBE
@@ -1058,22 +1153,6 @@
         }
       });
     }, 33);
-
-    // ─────────────────────────────────────────────────────
-    //  HEX DUMP
-    // ─────────────────────────────────────────────────────
-    const hexEl = document.getElementById("hexdump-content");
-    setInterval(() => {
-      let html = "";
-      for (let i = 0; i < 10; i++) {
-        const addr = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, "0");
-        const bytes = Array.from({ length: 8 }, () =>
-          Math.floor(Math.random() * 256).toString(16).padStart(2, "0")
-        ).join(" ");
-        html += `<div style="font-size:9px;line-height:1.4;color:rgba(0,255,100,0.5);white-space:pre;font-family:var(--terminal-font)">0x${addr}  ${bytes}</div>`;
-      }
-      hexEl.innerHTML = html;
-    }, 150);
 
     // ─────────────────────────────────────────────────────
     //  NETWORK LOG
@@ -1621,6 +1700,169 @@
       setTimeout(() => { fireTerminalGlitch(); scheduleGlitch(); }, delay);
     }
     scheduleGlitch();
+
+    // ─────────────────────────────────────────────────────
+    //  HACKER CHAT TOASTS
+    // ─────────────────────────────────────────────────────
+    const chatLayer = document.getElementById("chat-layer");
+
+    const HACKER_HANDLES = [
+      "c3r34l_k1ll3r", "crash_override", "z3r0_c00l", "ac1d_burn",
+      "ph4nt0m_ph0n3r", "n1ghtw1ng", "p1xelf4ce", "k0re_dump",
+      "voidsmith", "n3uromancer", "8b1t_w1tch", "syn_ack_jack",
+      "r00tk1t_l0v3r", "g1bs0n", "blackice_b4by", "n3tcr4wler",
+      "ic3pick", "n0_carrier", "trinity_88", "shadowbyte",
+      "kpunk", "midnight_w0lf", "p4nicb1tt0n", "tcp_t1mberw0lf",
+      "0xCAFEBABE", "razorf1sh", "bl0ckh3ad", "h0sts_d0wn",
+      "cypherp0nk", "k3rn3l_panic", "stack_smasher", "buff3r_qu33n",
+    ];
+
+    // Hacker chat lines — 70+ lines for variety. Mix of urgency, banter,
+    // bragging, paranoia. {target} is replaced with a random IP/host.
+    const CHAT_LINES = [
+      // urgency / paranoia
+      { text: "man, I think they're onto us — sending a spike to buy us time", tone: "warn" },
+      { text: "trace inbound from {target}, masking my MAC now", tone: "warn" },
+      { text: "fed pings from langley_15. cutting power to the relay.", tone: "danger" },
+      { text: "they're scanning subnet 17 — anyone got eyes?", tone: "warn" },
+      { text: "scrubbing the SSH logs, give me 30s", tone: "warn" },
+      { text: "ICE locked onto my exit node. bouncing through tor.", tone: "danger" },
+      { text: "feds are warm. dumping the stack and ghosting.", tone: "danger" },
+      { text: "DON'T TOUCH THE MAINFRAME — honeypot, fresh.", tone: "danger" },
+      { text: "we're burning. 90 seconds to extract.", tone: "danger" },
+      { text: "they triangulated the proxy. moving to fallback.", tone: "danger" },
+
+      // bragging / confidence
+      { text: "owned. rootkit deployed on {target} — payload hot.", tone: "" },
+      { text: "lol they didn't even rotate the SSH keys since 2019", tone: "" },
+      { text: "got the source. uploading to the dead drop.", tone: "" },
+      { text: "kerberos golden ticket minted. domain admin in 4mins.", tone: "" },
+      { text: "shadow file dumped — cracking now, ETA 12min", tone: "" },
+      { text: "no auth on port 8443. amateur hour.", tone: "" },
+      { text: "RDP open to the world. literally.", tone: "" },
+      { text: "telnet?? in this economy?? lmao", tone: "" },
+      { text: "mailserver was one CVE away from collapsing on its own", tone: "" },
+      { text: "10 lines of bash and they've lost the firewall", tone: "" },
+      { text: "vendor backdoor STILL open. christmas came early.", tone: "" },
+
+      // operational chatter
+      { text: "tunneling DNS over the satellite uplink", tone: "cyan" },
+      { text: "pivoting through the printer subnet — old trick, still works", tone: "cyan" },
+      { text: "cracking the WPA handshake, got 2GB of pcap", tone: "cyan" },
+      { text: "uploading a logic bomb to {target}, fuse: 6h", tone: "cyan" },
+      { text: "swapped routing tables. their packets go nowhere now.", tone: "cyan" },
+      { text: "I'm in. it's the gibson all over again.", tone: "cyan" },
+      { text: "dropping 0day on {target} in 3... 2...", tone: "cyan" },
+      { text: "ghost in the wire — no logs, no traces.", tone: "cyan" },
+      { text: "zero downtime patched out. moving lateral.", tone: "cyan" },
+      { text: "bouncing the signal through 7 countries", tone: "cyan" },
+      { text: "encrypted comms confirmed. going dark.", tone: "cyan" },
+      { text: "spoofed MAC, rotating again in 60s", tone: "cyan" },
+
+      // banter
+      { text: "anyone else getting weird latency tonight?", tone: "" },
+      { text: "the matrix has me. literally. someone yank the cable.", tone: "" },
+      { text: "tea break? been at this 36 hours.", tone: "" },
+      { text: "stop typing during my exfil!! creates EM noise.", tone: "warn" },
+      { text: "did anyone touch my screen session??", tone: "warn" },
+      { text: "remember when this was a fun hobby", tone: "" },
+      { text: "yeah real cool, you 'broke' the rate limiter. it's localhost.", tone: "" },
+      { text: "who's piggybacking on my tor circuit", tone: "warn" },
+      { text: "free pizza if anyone has a working 0day for cisco", tone: "" },
+      { text: "if you see traffic on 31337 that's me, don't kill it", tone: "" },
+
+      // alarming
+      { text: "kernel panic on the C&C box — fallback engaging", tone: "danger" },
+      { text: "SOMEONE TRIPPED THE HONEYPOT. scrub everything.", tone: "danger" },
+      { text: "CCTV at {target} is online — get out of frame", tone: "danger" },
+      { text: "they made the handle. burning it. new alias inbound.", tone: "danger" },
+      { text: "they spoofed me. impersonator on the channel.", tone: "danger" },
+      { text: "AI countermeasures detected. it's learning.", tone: "danger" },
+      { text: "drone overhead at the safe house. moving NOW.", tone: "danger" },
+
+      // technical theatre
+      { text: "running nmap -A on {target}, 8 ports open", tone: "cyan" },
+      { text: "iptables flush incoming, hold the line", tone: "cyan" },
+      { text: "found a buffer overflow in their auth daemon", tone: "" },
+      { text: "the schema's a mess but I can pivot from here", tone: "cyan" },
+      { text: "salted hashes? cute. running the rainbow tables.", tone: "" },
+      { text: "their CSP is just `*` — XSS heaven", tone: "" },
+      { text: "pcap shows beacon every 47s, that's the C2", tone: "cyan" },
+      { text: "uploading shellcode to /tmp/.x — they'll never look there", tone: "" },
+      { text: "race condition in the login form. classic.", tone: "" },
+      { text: "their git history has the api keys. unbelievable.", tone: "" },
+      { text: "found the .env in the public S3 bucket", tone: "" },
+      { text: "chmod 777 on production. who hurt them.", tone: "" },
+
+      // closing / signing off
+      { text: "extracted clean. handing the relay to the next shift.", tone: "" },
+      { text: "going dark. ping me on the back channel.", tone: "" },
+      { text: "wiped my tracks, see you in 6 weeks.", tone: "" },
+      { text: "all yours, leaving the proxy hot for 10min", tone: "cyan" },
+      { text: "drop's confirmed. payment in monero.", tone: "" },
+
+      // misc film-ish
+      { text: "hack the planet.", tone: "" },
+      { text: "they used 'password1'. they DESERVE this.", tone: "" },
+      { text: "remember: there is no spoon", tone: "" },
+      { text: "zero cool was here", tone: "" },
+      { text: "I'm not a script kiddie I just LOOK like one", tone: "" },
+    ];
+
+    function randomTarget() {
+      const r = Math.random();
+      if (r < 0.4) {
+        return `${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}`;
+      }
+      if (r < 0.7) {
+        const hosts = ["mainframe.langley", "darknet-relay-7", "gibson", "ellingson-mil",
+                       "cyberdyne.local", "tyrell.corp", "pentagon-vpn", "sublimit.io",
+                       "blackmesa.tld", "pyramid.gov", "node-313.dn", "nx-station-3"];
+        return hosts[Math.floor(Math.random() * hosts.length)];
+      }
+      return `[${Math.floor(Math.random()*0xffff).toString(16)}::${Math.floor(Math.random()*0xffff).toString(16)}]`;
+    }
+
+    function spawnChatToast() {
+      const handle = HACKER_HANDLES[Math.floor(Math.random() * HACKER_HANDLES.length)];
+      const line = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
+      const text = line.text.replace(/\{target\}/g, randomTarget());
+
+      const el = document.createElement("div");
+      el.className = "chat-toast" + (line.tone ? ` tone-${line.tone}` : "");
+      const handleEl = document.createElement("span");
+      handleEl.className = "chat-handle";
+      handleEl.textContent = handle;
+      el.appendChild(handleEl);
+      el.appendChild(document.createTextNode(" " + text));
+      chatLayer.appendChild(el);
+
+      // Cap visible toasts so the stack doesn't run away
+      while (chatLayer.children.length > 5) {
+        chatLayer.removeChild(chatLayer.firstChild);
+      }
+      // Hard removal after the CSS-out animation completes (~5.05s total)
+      setTimeout(() => el.remove(), 5200);
+    }
+
+    function scheduleChat() {
+      // Base cadence: 4–11s between solo messages.
+      const delay = 4000 + Math.random() * 7000;
+      setTimeout(() => {
+        spawnChatToast();
+        // Occasional chain: 2–4 messages quick-fire (different handles)
+        if (Math.random() < 0.18) {
+          const burst = 1 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < burst; i++) {
+            setTimeout(spawnChatToast, 600 + i * (500 + Math.random() * 700));
+          }
+        }
+        scheduleChat();
+      }, delay);
+    }
+    scheduleChat();
+    // Seed the screen with one early so it's visible quickly
+    setTimeout(spawnChatToast, 1200);
 
     // ─────────────────────────────────────────────────────
     //  SCANLINE FLICKER
